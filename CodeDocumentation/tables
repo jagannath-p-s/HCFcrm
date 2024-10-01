@@ -1,0 +1,214 @@
+-- Table: access_logs
+CREATE TABLE access_logs (
+    uid SERIAL PRIMARY KEY,
+    user_id VARCHAR NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    status INTEGER NOT NULL,
+    punch INTEGER NOT NULL
+);
+
+-- Table: equipment
+CREATE TABLE equipment (
+    id SERIAL PRIMARY KEY,
+    equipment_name VARCHAR NOT NULL,
+    model VARCHAR,
+    serial_number VARCHAR,
+    purchase_date DATE,
+    cost NUMERIC,
+    depreciation_rate NUMERIC,
+    current_value NUMERIC,
+    maintenance_schedule VARCHAR,
+    last_maintenance_date DATE,
+    next_maintenance_date DATE
+);
+
+-- Table: expense_type
+CREATE TABLE expense_type (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ
+);
+
+-- Table: expenses
+CREATE TABLE expenses (
+    id SERIAL PRIMARY KEY,
+    amount NUMERIC NOT NULL,
+    description TEXT,
+    expense_date DATE NOT NULL,
+    category_id INTEGER,
+    staff_id INTEGER,
+    created_at TIMESTAMPTZ,
+    final_date_to_pay DATE,
+    status VARCHAR NOT NULL,
+    expense_type VARCHAR NOT NULL
+);
+
+-- Table: incomes
+CREATE TABLE incomes (
+    id SERIAL PRIMARY KEY,
+    amount NUMERIC NOT NULL,
+    description TEXT,
+    income_date DATE NOT NULL,
+    user_id INTEGER,
+    membership_id INTEGER,
+    payment_mode_id INTEGER,
+    created_at TIMESTAMPTZ
+);
+
+-- Table: lead_sources
+CREATE TABLE lead_sources (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ
+);
+
+-- Table: leads
+CREATE TABLE leads (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    mobile_number VARCHAR NOT NULL,
+    lead_source VARCHAR,
+    first_enquiry_date DATE NOT NULL,
+    next_follow_up_date DATE,
+    remarks TEXT,
+    status VARCHAR,
+    created_at TIMESTAMPTZ,
+    last_updated TIMESTAMPTZ
+);
+
+-- Table: membership_plans
+CREATE TABLE membership_plans (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    duration_in_months INTEGER NOT NULL,
+    base_price NUMERIC NOT NULL,
+    created_at TIMESTAMPTZ,
+    type TEXT NOT NULL,
+    class_type TEXT,
+    additional_services TEXT,
+    group_discount BOOLEAN,
+    student_package BOOLEAN
+);
+
+-- Table: memberships
+CREATE TABLE memberships (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    membership_plan_id INTEGER NOT NULL,
+    payment_mode_id INTEGER NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    admission_or_renewal_fee NUMERIC NOT NULL,
+    additional_fee NUMERIC NOT NULL,
+    gst_percentage NUMERIC NOT NULL,
+    credit_used NUMERIC NOT NULL,
+    total_amount NUMERIC NOT NULL,
+    payment_date TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ
+);
+
+-- Table: payment_modes
+CREATE TABLE payment_modes (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ
+);
+
+-- Table: staff_salaries
+CREATE TABLE staff_salaries (
+    id SERIAL PRIMARY KEY,
+    staff_id INTEGER NOT NULL,
+    scheduled_payment_date DATE NOT NULL,
+    actual_payment_date DATE,
+    base_salary NUMERIC NOT NULL,
+    advance_amount NUMERIC,
+    advance_date DATE,
+    deductions NUMERIC,
+    bonuses NUMERIC,
+    net_salary NUMERIC,
+    status VARCHAR NOT NULL,
+    payment_mode_id INTEGER,
+    remarks TEXT,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+);
+
+-- Table: staffs
+CREATE TABLE staffs (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR NOT NULL,
+    useremail VARCHAR NOT NULL,
+    password VARCHAR NOT NULL,
+    role VARCHAR NOT NULL,
+    mobile_number VARCHAR NOT NULL,
+    employee_code VARCHAR NOT NULL,
+    active BOOLEAN,
+    start_date TIMESTAMPTZ NOT NULL,
+    end_date TIMESTAMPTZ NOT NULL,
+    user_id TEXT NOT NULL,
+    salary NUMERIC
+);
+
+-- Table: user_credits
+CREATE TABLE user_credits (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    total_credits NUMERIC NOT NULL,
+    used_credits NUMERIC NOT NULL,
+    available_credits NUMERIC,
+    updated_at TIMESTAMPTZ
+);
+
+-- Table: users
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    instance_id UUID,
+    user_id TEXT NOT NULL,
+    active BOOLEAN,
+    aud VARCHAR,
+    role VARCHAR,
+    subscription_end DATE,
+    name VARCHAR NOT NULL,
+    email VARCHAR,
+    date_of_birth DATE,
+    encrypted_password VARCHAR,
+    mobile_number_1 VARCHAR,
+    email_confirmed_at TIMESTAMPTZ,
+    mobile_number_2 VARCHAR,
+    invited_at TIMESTAMPTZ,
+    emergency_contact_number VARCHAR,
+    confirmation_token VARCHAR,
+    confirmation_sent_at TIMESTAMPTZ,
+    recovery_token VARCHAR,
+    blood_group VARCHAR,
+    medical_conditions TEXT,
+    recovery_sent_at TIMESTAMPTZ,
+    allergies TEXT,
+    email_change_token_new VARCHAR,
+    email_change VARCHAR,
+    injuries TEXT,
+    current_medications TEXT,
+    email_change_sent_at TIMESTAMPTZ,
+    fitness_goals TEXT,
+    last_sign_in_at TIMESTAMPTZ,
+    raw_app_meta_data JSONB,
+    raw_user_meta_data JSONB,
+    is_super_admin BOOLEAN,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ,
+    phone TEXT,
+    phone_confirmed_at TIMESTAMPTZ,
+    phone_change TEXT,
+    phone_change_token VARCHAR,
+    phone_change_sent_at TIMESTAMPTZ,
+    confirmed_at TIMESTAMPTZ,
+    email_change_token_current VARCHAR,
+    email_change_confirm_status SMALLINT,
+    banned_until TIMESTAMPTZ,
+    reauthentication_token VARCHAR,
+    reauthentication_sent_at TIMESTAMPTZ,
+    is_sso_user BOOLEAN NOT NULL,
+    deleted_at TIMESTAMPTZ,
+    is_anonymous BOOLEAN NOT NULL
+);
