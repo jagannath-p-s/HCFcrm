@@ -1,33 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '../supabaseClient';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DownloadIcon } from "lucide-react";
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 
 const Equipment = () => {
   const [equipmentList, setEquipmentList] = useState([]);
@@ -48,6 +32,8 @@ const Equipment = () => {
     next_maintenance_date: '',
   });
 
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
   useEffect(() => {
     fetchEquipment();
   }, []);
@@ -63,12 +49,12 @@ const Equipment = () => {
       .order('equipment_name', { ascending: true });
 
     if (error) {
-      console.error(`Error fetching equipment: ${error.message}`);
+      setSnackbar({ open: true, message: `Error fetching equipment: ${error.message}`, severity: 'error' });
     } else {
       const updatedData = data.map((item) => {
         const currentValue = calculateCurrentValue(
-          item.cost,
-          item.depreciation_rate,
+          item.cost || 0,  // default to 0 if null
+          item.depreciation_rate || 0,  // default to 0 if null
           item.purchase_date
         );
         return { ...item, current_value: currentValue };
@@ -79,7 +65,7 @@ const Equipment = () => {
   };
 
   const calculateCurrentValue = (cost, depreciationRate, purchaseDate) => {
-    if (!cost || !depreciationRate || !purchaseDate) return null;
+    if (!cost || !depreciationRate || !purchaseDate) return '0.00';
     const yearsElapsed = (new Date() - new Date(purchaseDate)) / (1000 * 60 * 60 * 24 * 365.25);
     const depreciationAmount = cost * (depreciationRate / 100) * yearsElapsed;
     const currentValue = cost - depreciationAmount;
@@ -125,7 +111,7 @@ const Equipment = () => {
       serial_number: '',
       purchase_date: '',
       cost: '',
-      depreciation_rate: '',
+      depreciation_rate: '0',
       maintenance_schedule: '',
       last_maintenance_date: '',
       next_maintenance_date: '',
@@ -171,14 +157,14 @@ const Equipment = () => {
 
     const { error } = response;
     if (error) {
-      console.error(`Error saving equipment: ${error.message}`);
+      setSnackbar({ open: true, message: `Error saving equipment: ${error.message}`, severity: 'error' });
     } else {
       fetchEquipment();
       setOpenDialog(false);
+      setSnackbar({ open: true, message: 'Equipment saved successfully.', severity: 'success' });
     }
   };
 
-  // **Download as CSV**
   const downloadCSV = () => {
     const headers = [
       'Serial No',
@@ -222,7 +208,6 @@ const Equipment = () => {
     document.body.removeChild(link);
   };
 
-  // **Download as PDF**
   const downloadPDF = () => {
     const doc = new jsPDF();
     doc.text('Equipment Data', 14, 20);
@@ -262,6 +247,8 @@ const Equipment = () => {
 
     doc.save('equipment_data.pdf');
   };
+
+  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   return (
     <div className="p-4">
@@ -348,137 +335,127 @@ const Equipment = () => {
             <DialogTitle>{editMode ? 'Edit Equipment' : 'Add New Equipment'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-  <div>
-    <label htmlFor="equipment_name" className="block text-sm font-medium text-gray-700">
-      Equipment Name
-    </label>
-    <Input
-      id="equipment_name"
-  
-      value={newEquipment.equipment_name}
-      onChange={(e) => setNewEquipment({ ...newEquipment, equipment_name: e.target.value })}
-    />
-  </div>
-  
-  <div>
-    <label htmlFor="model" className="block text-sm font-medium text-gray-700">
-      Model
-    </label>
-    <Input
-      id="model"
-  
-      value={newEquipment.model}
-      onChange={(e) => setNewEquipment({ ...newEquipment, model: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="equipment_name" className="block text-sm font-medium text-gray-700">
+                Equipment Name
+              </label>
+              <Input
+                id="equipment_name"
+                value={newEquipment.equipment_name}
+                onChange={(e) => setNewEquipment({ ...newEquipment, equipment_name: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="serial_number" className="block text-sm font-medium text-gray-700">
-      Serial Number
-    </label>
-    <Input
-      id="serial_number"
-     
-      value={newEquipment.serial_number}
-      onChange={(e) => setNewEquipment({ ...newEquipment, serial_number: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="model" className="block text-sm font-medium text-gray-700">
+                Model
+              </label>
+              <Input
+                id="model"
+                value={newEquipment.model}
+                onChange={(e) => setNewEquipment({ ...newEquipment, model: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="purchase_date" className="block text-sm font-medium text-gray-700">
-      Purchase Date
-    </label>
-    <Input
-      id="purchase_date"
+            <div>
+              <label htmlFor="serial_number" className="block text-sm font-medium text-gray-700">
+                Serial Number
+              </label>
+              <Input
+                id="serial_number"
+                value={newEquipment.serial_number}
+                onChange={(e) => setNewEquipment({ ...newEquipment, serial_number: e.target.value })}
+              />
+            </div>
 
-      type="date"
-      value={newEquipment.purchase_date}
-      onChange={(e) => setNewEquipment({ ...newEquipment, purchase_date: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="purchase_date" className="block text-sm font-medium text-gray-700">
+                Purchase Date
+              </label>
+              <Input
+                id="purchase_date"
+                type="date"
+                value={newEquipment.purchase_date}
+                onChange={(e) => setNewEquipment({ ...newEquipment, purchase_date: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="cost" className="block text-sm font-medium text-gray-700">
-      Cost
-    </label>
-    <Input
-      id="cost"
-     
-      type="number"
-      value={newEquipment.cost}
-      onChange={(e) => setNewEquipment({ ...newEquipment, cost: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="cost" className="block text-sm font-medium text-gray-700">
+                Cost
+              </label>
+              <Input
+                id="cost"
+                type="number"
+                value={newEquipment.cost}
+                onChange={(e) => setNewEquipment({ ...newEquipment, cost: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="depreciation_rate" className="block text-sm font-medium text-gray-700">
-      Depreciation Rate
-    </label>
-    <Input
-      id="depreciation_rate"
-   
-      type="number"
-      value={newEquipment.depreciation_rate}
-      onChange={(e) => setNewEquipment({ ...newEquipment, depreciation_rate: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="depreciation_rate" className="block text-sm font-medium text-gray-700">
+                Depreciation Rate
+              </label>
+              <Input
+                id="depreciation_rate"
+                type="number"
+                value={newEquipment.depreciation_rate}
+                onChange={(e) => setNewEquipment({ ...newEquipment, depreciation_rate: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="maintenance_schedule" className="block text-sm font-medium text-gray-700">
-      Maintenance Schedule
-    </label>
-    <Input
-      id="maintenance_schedule"
-     
-      value={newEquipment.maintenance_schedule}
-      onChange={(e) => setNewEquipment({ ...newEquipment, maintenance_schedule: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="maintenance_schedule" className="block text-sm font-medium text-gray-700">
+                Maintenance Schedule
+              </label>
+              <Input
+                id="maintenance_schedule"
+                value={newEquipment.maintenance_schedule}
+                onChange={(e) => setNewEquipment({ ...newEquipment, maintenance_schedule: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="last_maintenance_date" className="block text-sm font-medium text-gray-700">
-      Last Maintenance Date
-    </label>
-    <Input
-      id="last_maintenance_date"
-    
-      type="date"
-      value={newEquipment.last_maintenance_date}
-      onChange={(e) => setNewEquipment({ ...newEquipment, last_maintenance_date: e.target.value })}
-    />
-  </div>
+            <div>
+              <label htmlFor="last_maintenance_date" className="block text-sm font-medium text-gray-700">
+                Last Maintenance Date
+              </label>
+              <Input
+                id="last_maintenance_date"
+                type="date"
+                value={newEquipment.last_maintenance_date}
+                onChange={(e) => setNewEquipment({ ...newEquipment, last_maintenance_date: e.target.value })}
+              />
+            </div>
 
-  <div>
-    <label htmlFor="next_maintenance_date" className="block text-sm font-medium text-gray-700">
-      Next Maintenance Date
-    </label>
-    <Input
-      id="next_maintenance_date"
+            <div>
+              <label htmlFor="next_maintenance_date" className="block text-sm font-medium text-gray-700">
+                Next Maintenance Date
+              </label>
+              <Input
+                id="next_maintenance_date"
+                type="date"
+                value={newEquipment.next_maintenance_date}
+                onChange={(e) => setNewEquipment({ ...newEquipment, next_maintenance_date: e.target.value })}
+              />
+            </div>
 
-      type="date"
-      value={newEquipment.next_maintenance_date}
-      onChange={(e) => setNewEquipment({ ...newEquipment, next_maintenance_date: e.target.value })}
-    />
-  </div>
-
-  <div>
-    <label htmlFor="current_value" className="block text-sm font-medium text-gray-700">
-      Current Value
-    </label>
-    <Input
-      id="current_value"
-     
-      value={
-        calculateCurrentValue(
-          newEquipment.cost,
-          newEquipment.depreciation_rate,
-          newEquipment.purchase_date
-        ) || ''
-      }
-      disabled
-    />
-  </div>
-</div>
+            <div>
+              <label htmlFor="current_value" className="block text-sm font-medium text-gray-700">
+                Current Value
+              </label>
+              <Input
+                id="current_value"
+                value={
+                  calculateCurrentValue(
+                    newEquipment.cost || 0, // default to 0 if null
+                    newEquipment.depreciation_rate || 0, // default to 0 if null
+                    newEquipment.purchase_date
+                  ) || ''
+                }
+                disabled
+              />
+            </div>
+          </div>
 
           <div className="flex justify-end mt-4">
             <Button variant="outline" onClick={() => setOpenDialog(false)}>
@@ -490,6 +467,17 @@ const Equipment = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

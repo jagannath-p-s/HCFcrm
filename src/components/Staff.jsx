@@ -1,5 +1,7 @@
 
  import React, { useState, useEffect } from "react";
+ import { Eye, Edit, Trash2, } from 'lucide-react';
+
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -239,6 +241,15 @@ const Staff = () => {
       return acc;
     }, {});
   };
+///////////////////////////////////////////snackbar
+const [snackbarOpen, setSnackbarOpen] = useState(false);
+const [snackbarMessage, setSnackbarMessage] = useState("");
+const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+const handleSnackbarOpen = (message, severity = "success") => {
+  setSnackbarMessage(message);
+  setSnackbarSeverity(severity);
+  setSnackbarOpen(true);
+};
 
 // Edit Staff - Fetch details by user_id instead of useremail
 const openEditDialog = async (staff) => {
@@ -302,6 +313,7 @@ const handleEditStaff = async () => {
     } catch (err) {
       console.error("Error hashing password:", err.message);
     }
+    handleSnackbarOpen("Staff updated successfully.", "success");
   }
 };
 
@@ -328,7 +340,7 @@ const handleAddStaff = async () => {
           active: true,
         },
       ]);
-
+      handleSnackbarOpen("Staff added successfully.", "success");
       if (error) {
         console.error("Error adding new staff:", error);
       } else {
@@ -373,6 +385,7 @@ const handleAddStaff = async () => {
         fetchAttendanceDataForMonth();
       }
     }
+    handleSnackbarOpen("Staff deleted successfully.", "success");
   };
 
   const filteredAttendanceData = attendanceData.filter((staff) =>
@@ -520,16 +533,27 @@ const handleAddStaff = async () => {
                     <TableCell className="text-center">{record.daysLate}</TableCell>
                     {/* <TableCell className="text-center">{record.averageCheckIn}</TableCell> */}
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <MoreVertical className="h-5 w-5 cursor-pointer" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem onClick={() => openViewAttendance(record)}>View</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEditDialog(record)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openDeleteDialog(record)}>Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <MoreVertical className="h-5 w-5 cursor-pointer" />
+  </DropdownMenuTrigger>
+  <DropdownMenuContent align="start">
+    <DropdownMenuItem onClick={() => openViewAttendance(record)}>
+      <Eye className="mr-2 h-4 w-4" /> {/* Eye icon for View */}
+      View
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={() => openEditDialog(record)}>
+      <Edit className="mr-2 h-4 w-4" /> {/* Edit icon for Edit */}
+      Edit
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={() => openDeleteDialog(record)}>
+      <Trash2 className="mr-2 h-4 w-4" /> {/* Trash2 icon for Delete */}
+      Delete
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+
+
                     </TableCell>
                   </TableRow>
                 ))

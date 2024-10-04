@@ -204,7 +204,7 @@ const PARQForm = () => {
                     onChange={handleInputChange}
                     className="mt-1 block w-full border-b border-gray-300 font-bold"
                   />
-                  <span className="ml-1">in.</span>
+                  <span className="ml-1">cm</span>
                 </div>
               </div>
               <div className="w-1/4">
@@ -217,7 +217,7 @@ const PARQForm = () => {
                     onChange={handleInputChange}
                     className="mt-1 block w-full border-b border-gray-300 font-bold"
                   />
-                  <span className="ml-1">lbs.</span>
+                  <span className="ml-1">kg</span>
                 </div>
               </div>
               <div className="w-1/4">
