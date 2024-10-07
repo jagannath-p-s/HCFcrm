@@ -37,7 +37,7 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
           <p><strong>Plan:</strong> {membership?.membership_plans?.name}</p>
           <p><strong>Start Date:</strong> {membership?.start_date}</p>
           <p><strong>End Date:</strong> {membership?.end_date}</p>
-          <p><strong>Total Amount:</strong> ${membership?.total_amount}</p>
+          <p><strong>Total Amount:</strong> {membership?.total_amount}</p>
         </div>
 
         <p className="text-xs italic">
