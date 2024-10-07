@@ -28,7 +28,7 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
             <h2 className="text-lg font-bold">Her Chamber Fitness</h2>
             <p className="text-xs">Membership Bill</p>
           </div>
-          <img src={logo} alt="Logo" className="h-25" />
+          <img src={logo} alt="Logo" className="h-20" />
         </div>
 
         <div className="mb-4">

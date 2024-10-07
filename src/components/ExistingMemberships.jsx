@@ -7,13 +7,15 @@ import {
 } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
-import { MoreVertical, Trash2, MessageCircle, Printer } from 'lucide-react';
+import { Select, SelectTrigger, SelectContent, SelectItem } from '../components/ui/select';
+import { MoreVertical, Trash2, MessageCircle, Printer, FileText } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert from '@mui/material/Alert';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import MembershipDialog from './MembershipDialog';
-import PrintBillDialog from './PrintBillDialog'; // Import the PrintBillDialog component
+import PrintBillDialog from './PrintBillDialog'; 
 import { supabase } from '../supabaseClient';
 
 // Alert Component for Snackbar
@@ -24,6 +26,7 @@ function ExistingMemberships() {
   const [openMembershipDialog, setOpenMembershipDialog] = useState(false);
   const [openPrintDialog, setOpenPrintDialog] = useState(false); // State for Print Dialog
   const [selectedMembership, setSelectedMembership] = useState(null); // Selected membership for printing
+  const [todayIncome, setTodayIncome] = useState(0); // Total income for today
   const [dateRange, setDateRange] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
@@ -35,11 +38,13 @@ function ExistingMemberships() {
 
   useEffect(() => {
     fetchMemberships();
-  }, []);
+    calculateTodayIncome();
+  }, [dateRange, customFromDate, customToDate]);
 
   const fetchMemberships = async () => {
     try {
-      const { data: membershipsData, error } = await supabase.from('memberships').select(`
+      const today = new Date().toISOString().split('T')[0];
+      let query = supabase.from('memberships').select(`
         id,
         user_id,
         start_date,
@@ -49,10 +54,38 @@ function ExistingMemberships() {
         membership_plans!memberships_membership_plan_id_fkey (id, name),
         payment_modes (id, name)
       `);
+
+      if (dateRange === 'today') {
+        query = query.eq('start_date', today);
+      } else if (dateRange === 'custom') {
+        query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+      }
+
+      const { data: membershipsData, error } = await query;
       if (error) throw error;
       setMemberships(membershipsData);
     } catch (error) {
       console.error('Error fetching memberships:', error);
+    }
+  };
+
+  const calculateTodayIncome = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      let query = supabase.from('memberships').select('total_amount');
+
+      if (dateRange === 'today') {
+        query = query.eq('start_date', today);
+      } else if (dateRange === 'custom') {
+        query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const totalIncome = data.reduce((sum, membership) => sum + membership.total_amount, 0);
+      setTodayIncome(totalIncome);
+    } catch (error) {
+      console.error('Error calculating income:', error);
     }
   };
 
@@ -62,7 +95,8 @@ function ExistingMemberships() {
       if (error) throw error;
       setSnackbarMessage("Membership deleted successfully.");
       setSnackbarSeverity("success");
-      fetchMemberships(); // Refresh memberships after deletion
+      fetchMemberships();
+      calculateTodayIncome();
     } catch (error) {
       setSnackbarMessage(`Error: ${error.message}`);
       setSnackbarSeverity("error");
@@ -81,6 +115,24 @@ function ExistingMemberships() {
     setOpenPrintDialog(true);
   };
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Membership Report", 20, 10);
+    doc.text(`Total Income for Selected Period: ₹${todayIncome.toFixed(2)}`, 20, 20);
+
+    let yPos = 30;
+    memberships.forEach((membership) => {
+      doc.text(`User: ${membership.users.name}`, 20, yPos);
+      doc.text(`Plan: ${membership.membership_plans.name}`, 20, yPos + 10);
+      doc.text(`Start Date: ${membership.start_date}`, 20, yPos + 20);
+      doc.text(`End Date: ${membership.end_date}`, 20, yPos + 30);
+      doc.text(`Amount: ₹${membership.total_amount.toFixed(2)}`, 20, yPos + 40);
+      yPos += 50;
+    });
+
+    doc.save(`Membership_Report_${dateRange}.pdf`);
+  };
+
   const totalPages = Math.ceil(memberships.length / membershipsPerPage);
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
@@ -95,24 +147,35 @@ function ExistingMemberships() {
   return (
     <Card className="p-6">
       <CardHeader>
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <CardTitle className="text-2xl">Existing Memberships</CardTitle>
           <Button onClick={() => setOpenMembershipDialog(true)}>Add Membership</Button>
         </div>
-        <div className="mt-4">
-          <Label className="mr-3">Date Range</Label>
-          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="p-2 border rounded">
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="custom">Custom Range</option>
-          </select>
-          {dateRange === 'custom' && (
-            <div className="flex space-x-4 mt-4">
-              <Input type="date" value={customFromDate} onChange={(e) => setCustomFromDate(e.target.value)} />
-              <Input type="date" value={customToDate} onChange={(e) => setCustomToDate(e.target.value)} />
-            </div>
-          )}
+        <div className="mt-4 flex justify-between items-center">
+          <div>
+            <Label>Total Income:</Label>
+            <p className="font-bold text-lg">₹ {todayIncome.toFixed(2)}</p>
+          </div>
+          <div className="flex space-x-4">
+            <Select onValueChange={setDateRange} defaultValue={dateRange}>
+              <SelectTrigger>Date Range</SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            {dateRange === 'custom' && (
+              <>
+                <Input type="date" value={customFromDate} onChange={(e) => setCustomFromDate(e.target.value)} />
+                <Input type="date" value={customToDate} onChange={(e) => setCustomToDate(e.target.value)} />
+              </>
+            )}
+            <Button onClick={handleDownloadPDF}>
+              <FileText className="mr-2" /> Download Report
+            </Button>
+          </div>
         </div>
       </CardHeader>
 
@@ -126,7 +189,7 @@ function ExistingMemberships() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Mode</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount (₹)</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -138,7 +201,7 @@ function ExistingMemberships() {
                   <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.end_date}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.total_amount}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">₹ {membership.total_amount.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end space-x-2">
                     <Printer
                       className="cursor-pointer text-gray-600 hover:text-gray-800 w-4 h-4"
