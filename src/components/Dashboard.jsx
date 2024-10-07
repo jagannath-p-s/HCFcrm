@@ -6,282 +6,142 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { supabase } from '../supabaseClient';
-import {
-  startOfDay,
-  endOfDay,
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-} from 'date-fns';
-import { Users, UserCheck, Activity } from 'lucide-react';
-import CurrencyRupeeIcon from '@mui/icons-material/CurrencyRupee'; // Importing Rupee Icon
+import { Users } from 'lucide-react';
+import CurrencyRupee from '@mui/icons-material/CurrencyRupee';
+
+import Incomes from './Incomes';
+import Expenses from './Expenses';
+import Credits from './Credits';
+import Debts from './Debts';
+import ExistingMemberships from './ExistingMemberships';
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({
-    joinedToday: 0,
-    joinedThisWeek: 0,
-    joinedThisMonth: 0,
-    joinedThisYear: 0,
-    currentlyPresent: 0,
-    presentToday: 0,
-    subscriptionsSoldToday: 0,
+  const [dashboardStats, setDashboardStats] = useState({
+    totalMemberships: 0,
+    activeMemberships: 0,
+    totalIncome: 0,
+    totalRenewals: 0,
+    totalExpenses: 0,
     totalCredit: 0,
-    totalRevenue: 0,
-    totalEquipmentValue: 0,
+    totalDebt: 0,
   });
+  const [selectedMetric, setSelectedMetric] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchFinanceData();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const now = new Date();
-      const todayStart = startOfDay(now);
-      const todayEnd = endOfDay(now);
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      const yearStart = startOfYear(now);
-      const yearEnd = endOfYear(now);
+      const { data: membershipsData } = await supabase.from('memberships').select('*');
+      const totalMemberships = membershipsData.length;
 
-      // Fetch the number of users joined today
-      const { data: joinedTodayData, error: joinedTodayError } = await supabase
-        .from('users')
-        .select('id')
-        .gte('created_at', todayStart.toISOString())
-        .lte('created_at', todayEnd.toISOString());
-      if (joinedTodayError) throw joinedTodayError;
-      const joinedToday = joinedTodayData.length;
-
-      // Fetch the number of users who joined this week
-      const { data: joinedThisWeekData, error: joinedThisWeekError } = await supabase
-        .from('users')
-        .select('id')
-        .gte('created_at', weekStart.toISOString())
-        .lte('created_at', weekEnd.toISOString());
-      if (joinedThisWeekError) throw joinedThisWeekError;
-      const joinedThisWeek = joinedThisWeekData.length;
-
-      // Fetch the number of users who joined this month
-      const { data: joinedThisMonthData, error: joinedThisMonthError } = await supabase
-        .from('users')
-        .select('id')
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString());
-      if (joinedThisMonthError) throw joinedThisMonthError;
-      const joinedThisMonth = joinedThisMonthData.length;
-
-      // Fetch the number of users who joined this year
-      const { data: joinedThisYearData, error: joinedThisYearError } = await supabase
-        .from('users')
-        .select('id')
-        .gte('created_at', yearStart.toISOString())
-        .lte('created_at', yearEnd.toISOString());
-      if (joinedThisYearError) throw joinedThisYearError;
-      const joinedThisYear = joinedThisYearData.length;
-
-      // Fetch currently present members (based on access_logs)
-      const { data: currentAccessLogs, error: currentAccessLogsError } = await supabase
-        .from('access_logs')
-        .select('user_id, timestamp')
-        .gte('timestamp', todayStart.toISOString())
-        .lte('timestamp', now.toISOString());
-      if (currentAccessLogsError) throw currentAccessLogsError;
-
-      // Process current presence
-      const presenceMap = {};
-      currentAccessLogs.forEach((log) => {
-        if (!presenceMap[log.user_id]) {
-          presenceMap[log.user_id] = [];
-        }
-        presenceMap[log.user_id].push(log.timestamp);
-      });
-
-      let currentlyPresent = 0;
-      for (const userId in presenceMap) {
-        const timestamps = presenceMap[userId]
-          .map((ts) => new Date(ts))
-          .sort((a, b) => a - b);
-        if (timestamps.length % 2 !== 0) {
-          currentlyPresent += 1; // Odd number of logs means the member is still in the gym
-        }
-      }
-
-      // Number of members present today
-      const presentToday = Object.keys(presenceMap).length;
-
-      // Fetch the number of subscriptions sold today
-      const { data: subscriptionsTodayData, error: subscriptionsTodayError } = await supabase
+      const { data: activeMembershipsData } = await supabase
         .from('memberships')
         .select('id')
-        .gte('payment_date', todayStart.toISOString())
-        .lte('payment_date', todayEnd.toISOString());
-      if (subscriptionsTodayError) throw subscriptionsTodayError;
-      const subscriptionsSoldToday = subscriptionsTodayData.length;
+        .gte('end_date', new Date().toISOString());
+      const activeMemberships = activeMembershipsData.length;
 
-      // Fetch total credit (credit used in memberships)
-      const { data: totalCreditData, error: totalCreditError } = await supabase
-        .from('memberships')
-        .select('credit_used');
-      if (totalCreditError) throw totalCreditError;
-      const totalCredit = totalCreditData.reduce((acc, curr) => acc + curr.credit_used, 0);
-
-      // Fetch total revenue (total amount paid for memberships)
-      const { data: totalRevenueData, error: totalRevenueError } = await supabase
-        .from('memberships')
-        .select('total_amount');
-      if (totalRevenueError) throw totalRevenueError;
-      const totalRevenue = totalRevenueData.reduce((acc, curr) => acc + curr.total_amount, 0);
-
-      // Fetch total equipment value (sum of current_value column)
-      const { data: equipmentData, error: equipmentError } = await supabase
-        .from('equipment')
-        .select('current_value');
-      if (equipmentError) throw equipmentError;
-
-      // Calculate the total value of all equipment
-      const totalEquipmentValue = equipmentData.reduce(
-        (acc, curr) => acc + (curr.current_value || 0),
+      const totalIncome = membershipsData.reduce(
+        (sum, membership) => sum + membership.total_amount,
         0
       );
 
-      // Update state with the fetched data
-      setStats({
-        joinedToday,
-        joinedThisWeek,
-        joinedThisMonth,
-        joinedThisYear,
-        currentlyPresent,
-        presentToday,
-        subscriptionsSoldToday,
-        totalCredit,
-        totalRevenue,
-        totalEquipmentValue,
-      });
+      const totalRenewals = membershipsData.filter(
+        (membership) => membership.admission_or_renewal_fee > 0
+      ).length;
+
+      setDashboardStats((prevStats) => ({
+        ...prevStats,
+        totalMemberships,
+        activeMemberships,
+        totalIncome,
+        totalRenewals,
+      }));
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
   };
 
+  const fetchFinanceData = async () => {
+    try {
+      const { data: incomeData } = await supabase.from('incomes').select('amount');
+      const { data: expenseData } = await supabase.from('expenses').select('amount');
+      const { data: creditData } = await supabase.from('credits').select('credit_amount');
+      const { data: debtData } = await supabase.from('debts').select('debt_amount');
+
+      setDashboardStats((prevStats) => ({
+        ...prevStats,
+        totalIncome: (incomeData || []).reduce((sum, item) => sum + item.amount, 0),
+        totalExpenses: (expenseData || []).reduce((sum, item) => sum + item.amount, 0),
+        totalCredit: (creditData || []).reduce((sum, item) => sum + item.credit_amount, 0),
+        totalDebt: (debtData || []).reduce((sum, item) => sum + item.debt_amount, 0),
+      }));
+    } catch (error) {
+      console.error('Error fetching finance data:', error);
+    }
+  };
+
+  const renderMetricComponent = () => {
+    switch (selectedMetric) {
+      case 'Incomes':
+        return <Incomes stats={dashboardStats} />;
+      case 'Expenses':
+        return <Expenses stats={dashboardStats} />;
+      case 'Credits':
+        return <Credits stats={dashboardStats} />;
+      case 'Debts':
+        return <Debts stats={dashboardStats} />;
+      case 'Total Memberships':
+      case 'Active Memberships':
+      case 'Total Renewals':
+        return <ExistingMemberships stats={dashboardStats} metric={selectedMetric} />;
+      default:
+        return <p className="text-lg text-gray-600">Please select a category to view details.</p>;
+    }
+  };
+
+  const metrics = [
+    { name: 'Incomes', value: dashboardStats.totalIncome, color: 'text-green-600', icon: <CurrencyRupee /> },
+    { name: 'Expenses', value: dashboardStats.totalExpenses, color: 'text-red-600', icon: <CurrencyRupee /> },
+    { name: 'Credits', value: dashboardStats.totalCredit, color: 'text-blue-600', icon: <CurrencyRupee /> },
+    { name: 'Debts', value: dashboardStats.totalDebt, color: 'text-yellow-600', icon: <CurrencyRupee /> },
+    { name: 'Total Memberships', value: dashboardStats.totalMemberships, color: 'text-muted-foreground', icon: <Users /> },
+    { name: 'Active Memberships', value: dashboardStats.activeMemberships, color: 'text-green-600', icon: <Users /> },
+    
+  ];
+
   return (
-    <div className="mx-8 my-4"> {/* Added left and right margins */}
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+    <div className="mx-8 my-4">
+      <h1 className="text-2xl font-bold mb-4">Dashboard Overview</h1>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
-        {/* Joined Today */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Joined Today</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.joinedToday}</div>
-          </CardContent>
-        </Card>
+        {metrics.map((metric) => (
+          <Card
+            key={metric.name}
+            onClick={() => setSelectedMetric(metric.name)}
+            className={`cursor-pointer transition-all duration-200 ${
+              selectedMetric === metric.name ? 'border-2 border-blue-500 shadow-lg' : 'border border-gray-200'
+            }`}
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">{metric.name}</CardTitle>
+              {React.cloneElement(metric.icon, { className: `h-4 w-4 ${metric.color}` })}
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${metric.color}`}>
+                ₹{metric.name === 'Total Income' || metric.name === 'Total Expenses' || metric.name === 'Credits' || metric.name === 'Debts'
+                  ? metric.value.toFixed(2)
+                  : metric.value}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {/* Joined This Week */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Joined This Week</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.joinedThisWeek}</div>
-          </CardContent>
-        </Card>
-
-        {/* Joined This Month */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Joined This Month</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.joinedThisMonth}</div>
-          </CardContent>
-        </Card>
-
-        {/* Joined This Year */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Joined This Year</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.joinedThisYear}</div>
-          </CardContent>
-        </Card>
-
-        {/* Currently Present */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Currently Present</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.currentlyPresent}</div>
-          </CardContent>
-        </Card>
-
-        {/* Present Today */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-            <Activity className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.presentToday}</div>
-          </CardContent>
-        </Card>
-
-        {/* Subscriptions Sold Today */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Subscriptions Sold Today</CardTitle>
-            <CurrencyRupeeIcon className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.subscriptionsSoldToday}</div>
-          </CardContent>
-        </Card>
-
-        {/* Total Revenue */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <CurrencyRupeeIcon className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{stats.totalRevenue.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-
-        {/* Total Credit */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Credit</CardTitle>
-            <CurrencyRupeeIcon className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{stats.totalCredit.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-
-        {/* Total Equipment Value */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Equipment Value</CardTitle>
-            <CurrencyRupeeIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{stats.totalEquipmentValue.toFixed(2)}</div>
-          </CardContent>
-        </Card>
+      <div className="bg-white shadow-lg rounded-lg p-6 min-h-[400px]">
+        {renderMetricComponent()}
       </div>
     </div>
   );
