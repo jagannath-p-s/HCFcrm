@@ -18,7 +18,7 @@ function MembershipDialog({ open, onClose, refreshData }) {
     end_date: '',
     admission_or_renewal_fee: 0,
     plan_fee: 0,
-    additional_fee: 0,
+    additional_fee: 1000,
     total_amount: 0,
     remarks: '',
   });
@@ -205,7 +205,7 @@ function MembershipDialog({ open, onClose, refreshData }) {
                 </div>
 
                 <div className="mb-3">
-                  <Label>Additional Fee (₹)</Label>
+                  <Label>Admission Fee (₹)</Label>
                   <Input
                     id="additional-fee"
                     type="number"

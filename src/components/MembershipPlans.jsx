@@ -38,8 +38,7 @@ function MembershipPlans({ showSnackbar }) {
     type: '',
     class_type: '',
     additional_services: '',
-    group_discount: false,
-    student_package: false,
+    number_of_people: 1, // Default to 1 person
   });
   const [expanded, setExpanded] = useState(false); // State for expand/contract
   const [currentPage, setCurrentPage] = useState(1); // Pagination state
@@ -71,8 +70,7 @@ function MembershipPlans({ showSnackbar }) {
         type: '',
         class_type: '',
         additional_services: '',
-        group_discount: false,
-        student_package: false,
+        number_of_people: 1, // Reset to default value of 1 person
       }
     );
     setOpenPlanDialog(true);
@@ -83,9 +81,8 @@ function MembershipPlans({ showSnackbar }) {
   };
 
   const handlePlanFormChange = (e) => {
-    const { name, value, type: inputType, checked } = e.target;
-    const newValue = inputType === 'checkbox' ? checked : value;
-    setPlanFormData({ ...planFormData, [name]: newValue });
+    const { name, value } = e.target;
+    setPlanFormData({ ...planFormData, [name]: value });
   };
 
   const handlePlanFormSubmit = async () => {
@@ -101,8 +98,7 @@ function MembershipPlans({ showSnackbar }) {
             type: planFormData.type,
             class_type: planFormData.class_type,
             additional_services: planFormData.additional_services,
-            group_discount: planFormData.group_discount,
-            student_package: planFormData.student_package,
+            number_of_people: planFormData.number_of_people,
           })
           .eq('id', planFormData.id);
         if (error) throw error;
@@ -116,8 +112,7 @@ function MembershipPlans({ showSnackbar }) {
           type: planFormData.type,
           class_type: planFormData.class_type,
           additional_services: planFormData.additional_services,
-          group_discount: planFormData.group_discount,
-          student_package: planFormData.student_package,
+          number_of_people: planFormData.number_of_people,
         });
         if (error) throw error;
         showSnackbar('Plan created successfully', 'success');
@@ -238,8 +233,8 @@ function MembershipPlans({ showSnackbar }) {
               <TableHead>Base Price (Rs)</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Class Type</TableHead>
-              <TableHead>Group Discount</TableHead>
-              <TableHead>Student Package</TableHead>
+              <TableHead>Additional Services</TableHead>
+              <TableHead>Number of People</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -247,12 +242,12 @@ function MembershipPlans({ showSnackbar }) {
             {currentPlans.map((plan) => (
               <TableRow key={plan.id}>
                 <TableCell>{plan.name}</TableCell>
-                <TableCell>{plan.duration_in_days}</TableCell>
+                <TableCell>{plan.duration_in_days || 'N/A'}</TableCell>
                 <TableCell>{plan.base_price}</TableCell>
                 <TableCell>{plan.type}</TableCell>
                 <TableCell>{plan.class_type || 'N/A'}</TableCell>
-                <TableCell>{plan.group_discount ? 'Yes' : 'No'}</TableCell>
-                <TableCell>{plan.student_package ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{plan.additional_services || 'N/A'}</TableCell>
+                <TableCell>{plan.number_of_people || 1}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" onClick={() => handleOpenPlanDialog(plan)}>
                     <Edit className="h-4 w-4" />
@@ -302,7 +297,6 @@ function MembershipPlans({ showSnackbar }) {
               value={planFormData.duration_in_days}
               onChange={handlePlanFormChange}
               placeholder="Enter Duration (in Days)"
-              required
             />
             <Input
               label="Base Price (Rs)"
@@ -335,24 +329,15 @@ function MembershipPlans({ showSnackbar }) {
               onChange={handlePlanFormChange}
               placeholder="Enter Additional Services (optional)"
             />
-            <div className="flex items-center space-x-2">
-              <label>Group Discount</label>
-              <input
-                type="checkbox"
-                name="group_discount"
-                checked={planFormData.group_discount}
-                onChange={handlePlanFormChange}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <label>Student Package</label>
-              <input
-                type="checkbox"
-                name="student_package"
-                checked={planFormData.student_package}
-                onChange={handlePlanFormChange}
-              />
-            </div>
+            <Input
+              label="Number of People"
+              name="number_of_people"
+              type="number"
+              value={planFormData.number_of_people}
+              onChange={handlePlanFormChange}
+              placeholder="Enter Number of People"
+              required
+            />
             <Button onClick={handlePlanFormSubmit}>
               {planFormData.id ? 'Save Changes' : 'Create Plan'}
             </Button>

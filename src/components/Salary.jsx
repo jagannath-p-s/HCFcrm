@@ -94,19 +94,7 @@ const Salary = () => {
       <Card className="mb-8">
         <CardHeader className="flex justify-between">
           <CardTitle>Salary Management</CardTitle>
-          {/* Month Filter */}
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {generateMonthYearOptions().map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          
         </CardHeader>
         <CardContent>
           {/* Form to add or edit salary */}

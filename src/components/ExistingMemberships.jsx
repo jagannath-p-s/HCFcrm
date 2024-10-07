@@ -4,13 +4,13 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-} from '../components/ui/card'; // Adjust the import
+} from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { Edit2, Trash2, MoreVertical } from 'lucide-react';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
-import MembershipDialog from './MembershipDialog'; // Import the new component
+import MembershipDialog from './MembershipDialog';
 import { supabase } from '../supabaseClient';
 
 function ExistingMemberships() {
@@ -31,15 +31,14 @@ function ExistingMemberships() {
       const { data: membershipsData, error: membershipsError } = await supabase.from('memberships').select(`
         id,
         user_id,
-        membership_plan_id,
-        payment_mode_id,
         start_date,
         end_date,
         total_amount,
         users (id, name),
-        membership_plans (id, name),
+        membership_plans!memberships_membership_plan_id_fkey (id, name),
         payment_modes (id, name)
       `);
+      
       if (membershipsError) throw membershipsError;
       setMemberships(membershipsData);
     } catch (error) {
@@ -121,6 +120,7 @@ function ExistingMemberships() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -132,6 +132,7 @@ function ExistingMemberships() {
                   <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.end_date}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.total_amount}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -155,7 +156,7 @@ function ExistingMemberships() {
               ))}
               {memberships.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center">
+                  <td colSpan="7" className="px-6 py-4 text-center">
                     No memberships found.
                   </td>
                 </tr>

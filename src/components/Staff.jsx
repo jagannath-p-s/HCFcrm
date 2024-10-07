@@ -1,7 +1,5 @@
 
- import React, { useState, useEffect } from "react";
- import { Eye, Edit, Trash2, } from 'lucide-react';
-
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -57,6 +55,7 @@ const Staff = () => {
   const [late, setLate] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [newStaff, setNewStaff] = useState({
+    user_id: "", // Added user_id
     username: "",
     useremail: "",
     password: "",
@@ -65,6 +64,7 @@ const Staff = () => {
     employee_code: "",
     salary: "",
   });
+  
   const [selectedStaff, setSelectedStaff] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -241,15 +241,6 @@ const Staff = () => {
       return acc;
     }, {});
   };
-///////////////////////////////////////////snackbar
-const [snackbarOpen, setSnackbarOpen] = useState(false);
-const [snackbarMessage, setSnackbarMessage] = useState("");
-const [snackbarSeverity, setSnackbarSeverity] = useState("success");
-const handleSnackbarOpen = (message, severity = "success") => {
-  setSnackbarMessage(message);
-  setSnackbarSeverity(severity);
-  setSnackbarOpen(true);
-};
 
 // Edit Staff - Fetch details by user_id instead of useremail
 const openEditDialog = async (staff) => {
@@ -313,20 +304,36 @@ const handleEditStaff = async () => {
     } catch (err) {
       console.error("Error hashing password:", err.message);
     }
-    handleSnackbarOpen("Staff updated successfully.", "success");
   }
 };
 
 
 const handleAddStaff = async () => {
-  if (newStaff.username.trim() && newStaff.useremail.trim() && newStaff.password.trim()) {
+  if (
+    newStaff.user_id.trim() && // Check if user_id is provided
+    newStaff.username.trim() &&
+    newStaff.useremail.trim() &&
+    newStaff.password.trim()
+  ) {
     try {
       const salt = bcrypt.genSaltSync(12);
       const hashedPassword = bcrypt.hashSync(newStaff.password, salt);
 
-      const newUserId = `USR${Math.floor(Math.random() * 1000000)}`;
+      // Check if user_id already exists
+      const { data: existingStaff, error: existingError } = await supabase
+        .from("staffs")
+        .select("user_id")
+        .eq("user_id", newStaff.user_id)
+        .single();
+
+      if (existingStaff) {
+        console.error("User ID already exists.");
+        return;
+      }
+
       const { data, error } = await supabase.from("staffs").insert([
         {
+          user_id: newStaff.user_id.trim(), // Use the provided user_id
           username: newStaff.username.trim(),
           useremail: newStaff.useremail.trim(),
           password: hashedPassword,
@@ -335,17 +342,19 @@ const handleAddStaff = async () => {
           employee_code: newStaff.employee_code,
           salary: newStaff.salary ? parseFloat(newStaff.salary) : null,
           start_date: new Date().toISOString(),
-          end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-          user_id: newUserId,
+          end_date: new Date(
+            new Date().setFullYear(new Date().getFullYear() + 1)
+          ).toISOString(),
           active: true,
         },
       ]);
-      handleSnackbarOpen("Staff added successfully.", "success");
+
       if (error) {
         console.error("Error adding new staff:", error);
       } else {
         // Reset the form
         setNewStaff({
+          user_id: "",
           username: "",
           useremail: "",
           password: "",
@@ -355,7 +364,7 @@ const handleAddStaff = async () => {
           salary: "",
         });
         setIsDialogOpen(false);
-        fetchAttendanceDataForMonth();  // Refresh attendance data
+        fetchAttendanceDataForMonth(); // Refresh attendance data
       }
     } catch (err) {
       console.error("Error hashing password:", err.message);
@@ -364,6 +373,7 @@ const handleAddStaff = async () => {
     console.error("Please fill in all required fields.");
   }
 };
+
 
 
   // Delete Staff
@@ -385,7 +395,6 @@ const handleAddStaff = async () => {
         fetchAttendanceDataForMonth();
       }
     }
-    handleSnackbarOpen("Staff deleted successfully.", "success");
   };
 
   const filteredAttendanceData = attendanceData.filter((staff) =>
@@ -470,7 +479,15 @@ const handleAddStaff = async () => {
                   <DialogHeader>
                     <DialogTitle>Add New Staff</DialogTitle>
                   </DialogHeader>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <Input
+  placeholder="User ID"
+  value={newStaff.user_id}
+  onChange={(e) =>
+    setNewStaff({ ...newStaff, user_id: e.target.value })
+  }
+/>
                     <Input placeholder="Staff Name" value={newStaff.username} onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })} />
                     <Input placeholder="Email" value={newStaff.useremail} onChange={(e) => setNewStaff({ ...newStaff, useremail: e.target.value })} />
                     <Input placeholder="Password" type="password" value={newStaff.password} onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
@@ -533,27 +550,16 @@ const handleAddStaff = async () => {
                     <TableCell className="text-center">{record.daysLate}</TableCell>
                     {/* <TableCell className="text-center">{record.averageCheckIn}</TableCell> */}
                     <TableCell>
-                    <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <MoreVertical className="h-5 w-5 cursor-pointer" />
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="start">
-    <DropdownMenuItem onClick={() => openViewAttendance(record)}>
-      <Eye className="mr-2 h-4 w-4" /> {/* Eye icon for View */}
-      View
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={() => openEditDialog(record)}>
-      <Edit className="mr-2 h-4 w-4" /> {/* Edit icon for Edit */}
-      Edit
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={() => openDeleteDialog(record)}>
-      <Trash2 className="mr-2 h-4 w-4" /> {/* Trash2 icon for Delete */}
-      Delete
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
-
-
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <MoreVertical className="h-5 w-5 cursor-pointer" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onClick={() => openViewAttendance(record)}>View</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditDialog(record)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openDeleteDialog(record)}>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

@@ -1,144 +1,146 @@
-import React, { useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { MoreVertical, Edit, Trash2, ToggleLeft } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { supabase } from "../supabaseClient";
-import { Input } from "@/components/ui/input"; // Import Input for search bar
-import Snackbar from '@mui/material/Snackbar';
-import Alert from '@mui/material/Alert';
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { supabase } from '../supabaseClient';
 
-function UsersTable({ users, onEdit, refreshUsers }) {
-  const [searchQuery, setSearchQuery] = useState(""); // State for search query
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
-  // Handle delete user
-  const handleDeleteUser = async (userId) => {
-    try {
-      const { error } = await supabase.from("users").delete().eq("id", userId);
-      if (error) throw error;
-      setSnackbar({ open: true, message: "User deleted successfully.", severity: "success" });
-      refreshUsers(); // Refresh users after delete
-    } catch (error) {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: "error" });
-    }
-  };
-
-  // Toggle active status (Deactivate only)
-  const handleDeactivateUser = async (user) => {
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({ active: false })
-        .eq("id", user.id);
-
-      if (error) throw error;
-      setSnackbar({ open: true, message: "User deactivated successfully.", severity: "success" });
-      refreshUsers(); // Refresh users after deactivation
-    } catch (error) {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: "error" });
-    }
-  };
-
-  // Filter users based on the search query
-  const filteredUsers = users.filter((user) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      user.name.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      user.mobile_number_1.toLowerCase().includes(query)
-    );
+const SalaryForm = ({ staffs, onSalaryAdded }) => {
+  const [formData, setFormData] = useState({
+    staff_id: '',
+    scheduled_payment_date: '',
+    deductions: 0,
+    bonuses: 0,
+    salary_amount: 0, // This will be filled automatically
+    remarks: '',
   });
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+  // Fetch the selected staff's salary when staff is selected
+  const handleStaffSelect = async (staffId) => {
+    setFormData({ ...formData, staff_id: staffId });
+    
+    // Fetch the selected staff's salary from the `staffs` table
+    const { data, error } = await supabase
+      .from('staffs')
+      .select('salary')
+      .eq('id', staffId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching staff salary:', error);
+      return;
+    }
+
+    // Set the fetched salary into the form data
+    setFormData({ ...formData, staff_id: staffId, salary_amount: data.salary });
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleAddSalary = async () => {
+    try {
+      // Calculate net salary
+      const baseSalary = parseFloat(formData.salary_amount || 0);
+      const deductions = parseFloat(formData.deductions || 0);
+      const bonuses = parseFloat(formData.bonuses || 0);
+      const netSalary = baseSalary + bonuses - deductions;
+
+      // Insert the salary data into the database
+      const { data, error } = await supabase.from('staff_salaries').insert([
+        {
+          staff_id: formData.staff_id,
+          scheduled_payment_date: formData.scheduled_payment_date,
+          salary_amount: baseSalary,
+          deductions: deductions,
+          bonuses: bonuses,
+          net_salary: netSalary,
+          remarks: formData.remarks,
+          status: 'Pending',
+        },
+      ]);
+
+      if (error) {
+        console.error('Error inserting salary:', error);
+        return; // Stop if there is an error
+      }
+
+      console.log('Salary added successfully:', data);
+      setIsDialogOpen(false);
+      onSalaryAdded(); // Refresh the list after adding
+    } catch (error) {
+      console.error('Unexpected error:', error);
+    }
+  };
 
   return (
     <>
-      {/* Search Input */}
-      <div className="mb-4">
-        <Input
-          placeholder="Search by Name, Email, or Mobile Number"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)} />
-      </div>
+      <Button variant="default" onClick={() => setIsDialogOpen(true)}>
+        Schedule Salary Payment
+      </Button>
+      
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Schedule Salary Payment</DialogTitle>
+            <DialogDescription>Fill out the form below to schedule a salary payment.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Staff Selection */}
+            <div>
+              <label className="text-sm font-medium">Select Staff</label>
+              <Select value={formData.staff_id} onValueChange={handleStaffSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  {staffs.map((staff) => (
+                    <SelectItem key={staff.id} value={staff.id.toString()}>
+                      {staff.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      {/* Table to Display Users */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Mobile 1</TableHead>
-            <TableHead>Date of Birth</TableHead>
-            <TableHead>Blood Group</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredUsers.length > 0 ? (
-            filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.mobile_number_1}</TableCell>
-                <TableCell>{user.date_of_birth || "N/A"}</TableCell>
-                <TableCell>{user.blood_group || "N/A"}</TableCell>
-                <TableCell>
-                  <Badge variant={user.active ? "default" : "destructive"}>
-                    {user.active ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell>{user.role || "N/A"}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <MoreVertical className="h-5 w-5 cursor-pointer" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {user.active && (
-                        <DropdownMenuItem onClick={() => handleDeactivateUser(user)}>
-                          <ToggleLeft className="mr-2 h-4 w-4" />
-                          Deactivate
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => onEdit(user)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeleteUser(user.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center">
-                No users found.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            {/* Scheduled Payment Date */}
+            <div>
+              <label className="text-sm font-medium">Scheduled Payment Date</label>
+              <Input type="date" name="scheduled_payment_date" value={formData.scheduled_payment_date} onChange={handleChange} />
+            </div>
 
-      {/* Snackbar for Notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+            {/* Deductions */}
+            <div>
+              <label className="text-sm font-medium">Deductions</label>
+              <Input type="number" name="deductions" value={formData.deductions} onChange={handleChange} />
+            </div>
+
+            {/* Bonuses */}
+            <div>
+              <label className="text-sm font-medium">Bonuses</label>
+              <Input type="number" name="bonuses" value={formData.bonuses} onChange={handleChange} />
+            </div>
+
+            {/* Salary Amount (filled automatically) */}
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium">Base Salary</label>
+              <Input type="number" name="salary_amount" value={formData.salary_amount} readOnly />
+            </div>
+
+            {/* Remarks */}
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium">Remarks</label>
+              <Input name="remarks" value={formData.remarks} onChange={handleChange} />
+            </div>
+          </div>
+          <Button onClick={handleAddSalary} className="mt-4">Schedule Salary</Button>
+        </DialogContent>
+      </Dialog>
     </>
   );
-}
+};
 
-export default UsersTable;
+export default SalaryForm;
