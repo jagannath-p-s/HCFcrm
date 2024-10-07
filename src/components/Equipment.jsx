@@ -12,6 +12,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import { Edit, Trash } from "lucide-react"; // Import Lucide React icons
 
 const Equipment = () => {
   const [equipmentList, setEquipmentList] = useState([]);
@@ -20,6 +21,7 @@ const Equipment = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
+
   const [newEquipment, setNewEquipment] = useState({
     equipment_name: '',
     model: '',
@@ -63,6 +65,20 @@ const Equipment = () => {
       setFilteredEquipment(updatedData);
     }
   };
+
+
+  const handleDeleteEquipment = async (id) => {
+    const { error } = await supabase.from('equipment').delete().eq('id', id);
+  
+    if (error) {
+      setSnackbar({ open: true, message: `Error deleting equipment: ${error.message}`, severity: 'error' });
+    } else {
+      fetchEquipment();
+      setSnackbar({ open: true, message: 'Equipment deleted successfully.', severity: 'success' });
+    }
+  };
+  
+
 
   const calculateCurrentValue = (cost, depreciationRate, purchaseDate) => {
     if (!cost || !depreciationRate || !purchaseDate) return '0.00';
@@ -312,8 +328,13 @@ const Equipment = () => {
                   <TableCell>{item.depreciation_rate !== null ? item.depreciation_rate : 'N/A'}</TableCell>
                   <TableCell>{item.current_value !== null ? item.current_value : 'N/A'}</TableCell>
                   <TableCell>
-                    <Button variant="outline" onClick={() => handleEditEquipment(item)}>Edit</Button>
-                  </TableCell>
+  <Button className="mr-2" variant="outline" onClick={() => handleEditEquipment(item)}>
+    <Edit className="h-4 w-4" /> {/* Edit icon */}
+  </Button>
+  <Button variant="outline" onClick={() => handleDeleteEquipment(item.id)}>
+    <Trash className="h-4 w-4 text-red-500" /> {/* Trash icon with red color */}
+  </Button>
+</TableCell>
                 </TableRow>
               ))}
               {filteredEquipment.length === 0 && (

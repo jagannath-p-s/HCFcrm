@@ -7,19 +7,30 @@ import {
 } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
-import { Edit2, Trash2, MoreVertical } from 'lucide-react';
+import { MoreVertical, Trash2, MessageCircle, Printer } from 'lucide-react';
+import Snackbar from '@mui/material/Snackbar';
+import MuiAlert from '@mui/material/Alert';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import MembershipDialog from './MembershipDialog';
+import PrintBillDialog from './PrintBillDialog'; // Import the PrintBillDialog component
 import { supabase } from '../supabaseClient';
+
+// Alert Component for Snackbar
+const Alert = React.forwardRef((props, ref) => <MuiAlert elevation={6} ref={ref} {...props} />);
 
 function ExistingMemberships() {
   const [memberships, setMemberships] = useState([]);
   const [openMembershipDialog, setOpenMembershipDialog] = useState(false);
+  const [openPrintDialog, setOpenPrintDialog] = useState(false); // State for Print Dialog
+  const [selectedMembership, setSelectedMembership] = useState(null); // Selected membership for printing
   const [dateRange, setDateRange] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const membershipsPerPage = 10;
 
   useEffect(() => {
@@ -28,62 +39,57 @@ function ExistingMemberships() {
 
   const fetchMemberships = async () => {
     try {
-      const { data: membershipsData, error: membershipsError } = await supabase.from('memberships').select(`
+      const { data: membershipsData, error } = await supabase.from('memberships').select(`
         id,
         user_id,
         start_date,
         end_date,
         total_amount,
-        users (id, name),
+        users (id, name, mobile_number_1),
         membership_plans!memberships_membership_plan_id_fkey (id, name),
         payment_modes (id, name)
       `);
-      
-      if (membershipsError) throw membershipsError;
+      if (error) throw error;
       setMemberships(membershipsData);
     } catch (error) {
       console.error('Error fetching memberships:', error);
     }
   };
 
-  const handleOpenMembershipDialog = () => {
-    setOpenMembershipDialog(true);
+  const handleDeleteMembership = async (membershipId) => {
+    try {
+      const { error } = await supabase.from('memberships').delete().eq('id', membershipId);
+      if (error) throw error;
+      setSnackbarMessage("Membership deleted successfully.");
+      setSnackbarSeverity("success");
+      fetchMemberships(); // Refresh memberships after deletion
+    } catch (error) {
+      setSnackbarMessage(`Error: ${error.message}`);
+      setSnackbarSeverity("error");
+    } finally {
+      setSnackbarOpen(true);
+    }
   };
 
-  const handleCloseMembershipDialog = () => {
-    setOpenMembershipDialog(false);
-    fetchMemberships(); // Refresh membership data after adding
+  const handleWhatsApp = (user, plan, startDate) => {
+    const message = `Hi ${user.name}, your purchase of the ${plan.name} plan on ${startDate} was successful! Thank you for being a member of Her Chamber Fitness.`;
+    window.open(`https://wa.me/${user.mobile_number_1}?text=${encodeURIComponent(message)}`);
   };
 
-  const filterMembershipsByDateRange = () => {
-    const filteredMemberships = memberships.filter((membership) => {
-      const today = new Date();
-      const membershipDate = new Date(membership.start_date);
-      switch (dateRange) {
-        case 'today':
-          return membershipDate.toDateString() === today.toDateString();
-        case 'week':
-          const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
-          return membershipDate >= startOfWeek;
-        case 'month':
-          return membershipDate.getMonth() === today.getMonth() && membershipDate.getFullYear() === today.getFullYear();
-        case 'custom':
-          const from = new Date(customFromDate);
-          const to = new Date(customToDate);
-          return membershipDate >= from && membershipDate <= to;
-        default:
-          return true;
-      }
-    });
-    return filteredMemberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage);
+  const handlePrint = (membership) => {
+    setSelectedMembership(membership);
+    setOpenPrintDialog(true);
   };
 
   const totalPages = Math.ceil(memberships.length / membershipsPerPage);
-
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
     }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
   };
 
   return (
@@ -91,10 +97,10 @@ function ExistingMemberships() {
       <CardHeader>
         <div className="flex justify-between">
           <CardTitle className="text-2xl">Existing Memberships</CardTitle>
-          <Button onClick={handleOpenMembershipDialog}>Add Membership</Button>
+          <Button onClick={() => setOpenMembershipDialog(true)}>Add Membership</Button>
         </div>
         <div className="mt-4">
-          <Label>Date Range</Label>
+          <Label className="mr-3">Date Range</Label>
           <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="p-2 border rounded">
             <option value="today">Today</option>
             <option value="week">This Week</option>
@@ -115,17 +121,17 @@ function ExistingMemberships() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Mode</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filterMembershipsByDateRange().map((membership) => (
+              {memberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage).map((membership) => (
                 <tr key={membership.id}>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.users.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plans.name}</td>
@@ -133,7 +139,15 @@ function ExistingMemberships() {
                   <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.end_date}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.total_amount}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end space-x-2">
+                    <Printer
+                      className="cursor-pointer text-gray-600 hover:text-gray-800 w-4 h-4"
+                      onClick={() => handlePrint(membership)}
+                    />
+                    <MessageCircle
+                      className="text-green-500 cursor-pointer hover:text-green-700 w-4 h-4"
+                      onClick={() => handleWhatsApp(membership.users, membership.membership_plans, membership.start_date)}
+                    />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -141,11 +155,7 @@ function ExistingMemberships() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="cursor-pointer">
-                          <Edit2 className="w-4 h-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleDeleteMembership(membership.id)}>
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
@@ -177,7 +187,27 @@ function ExistingMemberships() {
         </div>
       </CardContent>
 
-      <MembershipDialog open={openMembershipDialog} onClose={handleCloseMembershipDialog} refreshData={fetchMemberships} />
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
+      <MembershipDialog open={openMembershipDialog} onClose={() => setOpenMembershipDialog(false)} refreshData={fetchMemberships} />
+
+      {/* PrintBillDialog for printing selected membership */}
+      {selectedMembership && (
+        <PrintBillDialog
+          open={openPrintDialog}
+          onClose={() => setOpenPrintDialog(false)}
+          membership={selectedMembership}
+        />
+      )}
     </Card>
   );
 }
