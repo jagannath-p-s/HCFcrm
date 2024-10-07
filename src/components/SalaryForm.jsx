@@ -143,4 +143,6 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
   );
 };
 
+
+
 export default SalaryForm;
