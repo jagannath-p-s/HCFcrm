@@ -75,10 +75,13 @@ function MembershipDialog({ open, onClose, refreshData }) {
       endDate.setDate(startDate.getDate() + selectedPlan.duration_in_days);
     }
 
+    // Calculate the plan fee per person
+    const planFeePerPerson = selectedPlan.base_price / (selectedPlan.number_of_people || 1);
+
     setMembershipFormData(prev => ({
       ...prev,
       membership_plan_id: planId,
-      plan_fee: selectedPlan.base_price || 0,
+      plan_fee: planFeePerPerson,
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
       admission_or_renewal_fee: selectedPlan.type.toLowerCase() === 'admission fee' ? selectedPlan.base_price : 0,

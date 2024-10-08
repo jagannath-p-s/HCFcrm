@@ -6,6 +6,7 @@ import {
   CardContent,
 } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import 'jspdf-autotable';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { Select, SelectTrigger, SelectContent, SelectItem } from '../components/ui/select';
 import { MoreVertical, Trash2, MessageCircle, Printer, FileText } from 'lucide-react';
@@ -29,6 +30,20 @@ const formatIndianDate = (date) => {
     month: '2-digit',
     year: 'numeric',
   }).format(new Date(date));
+};
+
+// Utility function to format date and time in Indian format (DD-MM-YYYY HH:MM)
+const formatIndianDateTime = (dateTime) => {
+  if (!dateTime) return '';
+  const options = {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  };
+  return new Intl.DateTimeFormat('en-IN', options).format(new Date(dateTime));
 };
 
 function ExistingMemberships() {
@@ -60,6 +75,7 @@ function ExistingMemberships() {
         start_date,
         end_date,
         total_amount,
+        created_at,
         users (id, name, mobile_number_1, date_of_birth),
         membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
         admission_plan:membership_plans!memberships_admission_plan_id_fkey (id, name),
@@ -129,21 +145,174 @@ function ExistingMemberships() {
 
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
-    doc.text("Membership Report", 20, 10);
-    doc.text(`Total Income for Selected Period: ₹${todayIncome.toFixed(2)}`, 20, 20);
 
-    let yPos = 30;
-    memberships.forEach((membership) => {
-      doc.text(`User: ${membership.users.name}`, 20, yPos);
-      doc.text(`Plan: ${membership.membership_plan.name}`, 20, yPos + 10);
-      doc.text(`Start Date: ${membership.start_date}`, 20, yPos + 20);
-      doc.text(`End Date: ${membership.end_date}`, 20, yPos + 30);
-      doc.text(`DOB: ${formatIndianDate(membership.users.date_of_birth)}`, 20, yPos + 40);
-      doc.text(`Amount: ₹${membership.total_amount.toFixed(2)}`, 20, yPos + 50);
-      yPos += 60;
+    // Set the document title with underline
+    doc.setFont("times", "bold");
+    doc.setFontSize(24);
+    doc.text("Membership Report", 20, 30);
+    doc.setLineWidth(0.5);
+    doc.line(20, 33, 200, 33);
+
+    // Add the date range and total income as a subheading
+    const startDate = dateRange === 'custom' && customFromDate ? formatIndianDate(customFromDate) : '';
+    const endDate = dateRange === 'custom' && customToDate ? formatIndianDate(customToDate) : '';
+    const dateRangeText = dateRange === 'custom' ? `${startDate} - ${endDate}` : 'Today';
+
+    doc.setFontSize(14);
+    doc.setFont("times", "normal");
+    doc.text(`Total Income for Selected Period: ${todayIncome.toFixed(2)}`, 20, 45);
+    doc.text(`Time Period: ${dateRangeText}`, 20, 55);
+
+    // Prepare data for the table with created_at included
+    const tableData = memberships.map((membership, index) => ([
+        index + 1,
+        membership.users.name,
+        membership.membership_plan.name,
+        formatIndianDate(membership.start_date),
+        formatIndianDate(membership.end_date),
+        formatIndianDate(membership.users.date_of_birth),
+        formatIndianDateTime(membership.created_at),
+        `${membership.total_amount.toFixed(2)}`
+    ]));
+
+    // Define the table columns
+    const tableColumns = [
+        { header: "S.No", dataKey: "sno" },
+        { header: "User", dataKey: "user" },
+        { header: "Plan", dataKey: "plan" },
+        { header: "Start Date", dataKey: "startDate" },
+        { header: "End Date", dataKey: "endDate" },
+        { header: "DOB", dataKey: "dob" },
+        { header: "Created At", dataKey: "createdAt" },
+        { header: "Amount", dataKey: "amount" }
+    ];
+
+    // Use autoTable to add the table to the PDF
+    doc.autoTable({
+        startY: 65,
+        head: [tableColumns.map(col => col.header)],
+        body: tableData,
+        styles: {
+            fontSize: 10,
+            cellPadding: 5,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak',
+            minCellHeight: 10,
+            textColor: [0, 0, 0],
+            lineColor: [200, 200, 200],
+            lineWidth: 0.1,
+        },
+        headStyles: {
+            fillColor: [245, 245, 245], // Light gray for header background
+            textColor: [100, 100, 100], // Darker gray text
+            fontStyle: 'bold',
+            halign: 'left',
+            fontSize: 12,
+        },
+        alternateRowStyles: {
+            fillColor: [255, 255, 255] // White background for alternate rows
+        },
+        columnStyles: {
+            0: { halign: 'center' }, // Center-align S.No column
+            7: { halign: 'right' } // Right-align Amount column
+        },
+        theme: 'grid',
+        didDrawPage: function (data) {
+            // Add footer with page number
+            const pageCount = doc.internal.getNumberOfPages();
+            doc.setFontSize(10);
+            doc.text(`Page ${data.pageNumber} of ${pageCount}`, 105, 290, { align: 'center' });
+        }
     });
 
-    doc.save(`Membership_Report_${dateRange}.pdf`);
+    // Save the PDF with a formatted date
+    const formattedDate = formatIndianDate(new Date().toISOString());
+    doc.save(`Membership_Report_${formattedDate}.pdf`);
+};
+
+  const getDateRangeText = () => {
+    if (dateRange === 'custom') {
+      const startDate = customFromDate ? formatIndianDate(customFromDate) : '';
+      const endDate = customToDate ? formatIndianDate(customToDate) : '';
+      return `${startDate} - ${endDate}`;
+    }
+    return 'Today';
+  };
+  
+  const addMembershipTable = (doc) => {
+    const tableData = prepareMembershipData();
+    const tableColumns = defineTableColumns();
+    
+    doc.autoTable({
+      startY: 65,
+      head: [tableColumns.map(col => col.header)],
+      body: tableData,
+      ...tableStyles,
+      didDrawPage: addPageNumber
+    });
+  };
+  
+  const prepareMembershipData = () => 
+    memberships.map((membership, index) => ([
+      index + 1,
+      membership.users.name,
+      membership.membership_plan.name,
+      formatIndianDate(membership.start_date),
+      formatIndianDate(membership.end_date),
+      formatIndianDate(membership.users.date_of_birth),
+      formatIndianDateTime(membership.created_at),
+      `₹${membership.total_amount.toFixed(2)}`
+    ]));
+  
+  const defineTableColumns = () => [
+    { header: "S.No", dataKey: "sno", width: 15 },
+    { header: "User", dataKey: "user", width: 35 },
+    { header: "Plan", dataKey: "plan", width: 30 },
+    { header: "Start Date", dataKey: "startDate", width: 25 },
+    { header: "End Date", dataKey: "endDate", width: 25 },
+    { header: "DOB", dataKey: "dob", width: 25 },
+    { header: "Created At", dataKey: "createdAt", width: 35 },
+    { header: "Amount ", dataKey: "amount", width: 25 }
+  ];
+  
+  const tableStyles = {
+    styles: {
+      fontSize: 11,
+      cellPadding: 5,
+      halign: 'center',
+      valign: 'middle',
+      overflow: 'linebreak',
+      minCellHeight: 10,
+      textColor: [0, 0, 0],
+      lineColor: [200, 200, 200],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [0, 0, 0],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      halign: 'center',
+    },
+    alternateRowStyles: {
+      fillColor: [240, 240, 240]
+    },
+    columnStyles: {
+      0: { halign: 'center' },
+      7: { halign: 'right' }
+    },
+    theme: 'grid',
+  };
+  
+  const addPageNumber = (data) => {
+    const pageCount = data.doc.internal.getNumberOfPages();
+    data.doc.setFontSize(10);
+    data.doc.text(`Page ${data.pageNumber} of ${pageCount}`, 105, 290, { align: 'center' });
+  };
+  
+  const savePDF = (doc) => {
+    const formattedDate = formatIndianDate(new Date().toISOString());
+    doc.save(`Membership_Report_${formattedDate}.pdf`);
   };
 
   const totalPages = Math.ceil(memberships.length / membershipsPerPage);
@@ -214,8 +383,8 @@ function ExistingMemberships() {
                   <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.users.date_of_birth)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plan.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.end_date}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.start_date)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.end_date)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">₹ {membership.total_amount.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end space-x-2">
                     <Printer

@@ -77,7 +77,7 @@ const Finance = () => {
             key={category.name}
             onClick={() => setSelectedCategory(category.name)}
             className={`cursor-pointer transition-all duration-200 ${
-              selectedCategory === category.name ? 'border-2 border-blue-500 shadow-lg' : 'border border-gray-200'
+              selectedCategory === category.name ? 'border-2 border-blue-500 ' : 'border border-gray-200'
             }`}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -91,7 +91,7 @@ const Finance = () => {
         ))}
       </div>
 
-      <div className="bg-white shadow-lg rounded-lg p-6 min-h-[400px]">
+      <div className="bg-white  rounded-lg p-6 min-h-[400px]">
         {renderCategoryComponent()}
       </div>
     </div>

@@ -11,7 +11,7 @@ const Salary = () => {
   const [salaries, setSalaries] = useState([]);
   const [staffs, setStaffs] = useState([]);
   const [advances, setAdvances] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM')); // Default current month
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM')); // Default to current month
 
   useEffect(() => {
     fetchData();
@@ -32,7 +32,7 @@ const Salary = () => {
     }
   };
 
-  // Fetch salary data directly from staff_salaries with all fields and staff username
+  // Fetch salary data with date filters applied
   const fetchSalaries = async () => {
     const [year, month] = selectedMonth.split('-');
     const startDate = startOfMonth(new Date(year, month - 1));
@@ -51,9 +51,9 @@ const Salary = () => {
     }
   };
 
-  // Fetch advance data
+  // Fetch advances for the selected month
   const fetchAdvances = async () => {
-    const { data, error } = await supabase.from('advances').select('*');
+    const { data, error } = await supabase.from('advances').select('*').like('advance_date', `${selectedMonth}%`);
     if (error) {
       console.error('Error fetching advances:', error);
     } else {
@@ -61,7 +61,7 @@ const Salary = () => {
     }
   };
 
-  // Refresh the salary list after adding a salary
+  // Refresh salary list after adding a salary
   const handleSalaryAdded = () => {
     fetchSalaries();
   };
@@ -69,10 +69,10 @@ const Salary = () => {
   // Refresh both salary and advances list after adding an advance
   const handleAdvanceAdded = () => {
     fetchAdvances();
-    fetchSalaries(); // Update salaries because advance amount may affect deductions
+    fetchSalaries(); // Update salaries as advance may affect deductions
   };
 
-  // Mark a salary as paid and refresh the salary list
+  // Mark a salary as paid and refresh
   const handleMarkAsPaid = async (salary) => {
     const { error } = await supabase.from('staff_salaries').update({ status: 'Paid' }).eq('id', salary.id);
     if (error) {
@@ -82,7 +82,7 @@ const Salary = () => {
     }
   };
 
-  // Delete a salary and refresh the salary list
+  // Delete a salary and refresh
   const handleDeleteSalary = async (salaryId) => {
     const { error } = await supabase.from('staff_salaries').delete().eq('id', salaryId);
     if (error) {
@@ -96,7 +96,7 @@ const Salary = () => {
   const generateMonthYearOptions = () => {
     const options = [];
     const currentYear = new Date().getFullYear();
-    const years = [currentYear - 1, currentYear, currentYear + 1]; // Allow selection for 3 years: past, current, future
+    const years = [currentYear - 1, currentYear, currentYear + 1]; // Past, current, future year options
 
     years.forEach((year) => {
       for (let month = 0; month < 12; month++) {
@@ -133,9 +133,14 @@ const Salary = () => {
           <CardTitle>Salary Management</CardTitle>
         </CardHeader>
         <CardContent>
-          <SalaryForm staffs={staffs} onSalaryAdded={handleSalaryAdded} />
+          <SalaryForm
+            staffs={staffs}
+            selectedMonth={selectedMonth} // Pass selected month to schedule salary on the first of the month
+            onSalaryAdded={handleSalaryAdded}
+          />
           <SalaryList
             salaries={salaries}
+            format={format}
             fetchSalaries={fetchSalaries}
           />
         </CardContent>

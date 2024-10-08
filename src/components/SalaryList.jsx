@@ -58,14 +58,16 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
     return options;
   };
 
-  // Mark salary as paid and create an expense
+  // Mark salary as paid and create an expense for it
   const handleMarkAsPaid = async (salary) => {
     try {
+      // Update the salary status to 'Paid'
       await supabase
         .from('staff_salaries')
         .update({ status: 'Paid' })
         .eq('id', salary.id);
 
+      // Insert the expense record for the salary payment
       await supabase.from('expenses').insert([
         {
           amount: salary.net_salary,
@@ -73,7 +75,7 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
           expense_date: new Date().toISOString(),
           category_id: null, // Set category if applicable
           staff_id: salary.staff_id,
-          status: 'paid',
+          status: 'Paid',
           expense_type: 'Salary',
         },
       ]);
@@ -86,9 +88,10 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
     }
   };
 
-  // Delete salary and corresponding expense
+  // Delete salary and the corresponding expense entry
   const handleDelete = async (salary) => {
     try {
+      // Delete associated expense first
       await supabase
         .from('expenses')
         .delete()
@@ -96,6 +99,7 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
         .eq('expense_type', 'Salary')
         .eq('amount', salary.net_salary);
 
+      // Delete the salary entry
       await supabase.from('staff_salaries').delete().eq('id', salary.id);
 
       handleSnackbarOpen('Salary and associated expense deleted successfully.');
@@ -171,7 +175,7 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
         </TableBody>
       </Table>
 
-      {/* Bottom-Centered Snackbar for Success/Error messages */}
+      {/* Snackbar for Success/Error messages */}
       <Snackbar
         open={snackbarOpen}
         onClose={handleSnackbarClose}

@@ -129,7 +129,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${metric.color}`}>
-                ₹{metric.value.toFixed(2)}
+                {metric.name.includes('Memberships') ? metric.value : `₹${metric.value.toFixed(2)}`}
               </div>
             </CardContent>
           </Card>
