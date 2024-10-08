@@ -21,6 +21,16 @@ import { supabase } from '../supabaseClient';
 // Alert Component for Snackbar
 const Alert = React.forwardRef((props, ref) => <MuiAlert elevation={6} ref={ref} {...props} />);
 
+// Utility function to format date to DD-MM-YYYY
+const formatIndianDate = (date) => {
+  if (!date) return '';
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(date));
+};
+
 function ExistingMemberships() {
   const [memberships, setMemberships] = useState([]);
   const [openMembershipDialog, setOpenMembershipDialog] = useState(false);
@@ -50,7 +60,7 @@ function ExistingMemberships() {
         start_date,
         end_date,
         total_amount,
-        users (id, name, mobile_number_1),
+        users (id, name, mobile_number_1, date_of_birth),
         membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
         admission_plan:membership_plans!memberships_admission_plan_id_fkey (id, name),
         additional_service_plan:membership_plans!memberships_additional_service_plan_id_fkey (id, name),
@@ -128,8 +138,9 @@ function ExistingMemberships() {
       doc.text(`Plan: ${membership.membership_plan.name}`, 20, yPos + 10);
       doc.text(`Start Date: ${membership.start_date}`, 20, yPos + 20);
       doc.text(`End Date: ${membership.end_date}`, 20, yPos + 30);
-      doc.text(`Amount: ₹${membership.total_amount.toFixed(2)}`, 20, yPos + 40);
-      yPos += 50;
+      doc.text(`DOB: ${formatIndianDate(membership.users.date_of_birth)}`, 20, yPos + 40);
+      doc.text(`Amount: ₹${membership.total_amount.toFixed(2)}`, 20, yPos + 50);
+      yPos += 60;
     });
 
     doc.save(`Membership_Report_${dateRange}.pdf`);
@@ -187,6 +198,7 @@ function ExistingMemberships() {
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Mode</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
@@ -199,6 +211,7 @@ function ExistingMemberships() {
               {memberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage).map((membership) => (
                 <tr key={membership.id}>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.users.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.users.date_of_birth)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plan.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
@@ -231,7 +244,7 @@ function ExistingMemberships() {
               ))}
               {memberships.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center">
+                  <td colSpan="8" className="px-6 py-4 text-center">
                     No memberships found.
                   </td>
                 </tr>
