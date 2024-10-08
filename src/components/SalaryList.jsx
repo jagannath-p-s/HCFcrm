@@ -1,23 +1,23 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { format, parseISO } from 'date-fns';
-import { Edit3, Trash } from 'lucide-react'; // Import icons
+import { Trash } from 'lucide-react';
 import Snackbar from '@mui/material/Snackbar';
 import SnackbarContent from '@mui/material/SnackbarContent';
 import { supabase } from '../supabaseClient';
 
-const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
-  const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM')); // Default to current month
+const SalaryList = ({ salaries, fetchSalaries }) => {
+  const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Filter salaries based on the selected month
   const filteredSalaries = salaries.filter((salary) => {
-    const scheduledDate = parseISO(salary.scheduled_payment_date);
-    const formattedDate = format(scheduledDate, 'yyyy-MM');
+    const paymentDate = salary.payment_date ? parseISO(salary.payment_date) : null;
+    const formattedDate = paymentDate ? format(paymentDate, 'yyyy-MM') : '';
     return formattedDate === filterMonth;
   });
 
@@ -61,13 +61,11 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
   // Mark salary as paid and create an expense
   const handleMarkAsPaid = async (salary) => {
     try {
-      // Mark salary as paid
       await supabase
         .from('staff_salaries')
         .update({ status: 'Paid' })
         .eq('id', salary.id);
 
-      // Create new expense for the paid salary
       await supabase.from('expenses').insert([
         {
           amount: salary.net_salary,
@@ -81,7 +79,7 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
       ]);
 
       handleSnackbarOpen('Salary marked as paid and expense created.');
-      fetchSalaries(); // Refresh the salary list after marking as paid
+      fetchSalaries();
     } catch (error) {
       console.error('Error marking salary as paid or creating expense:', error);
       handleSnackbarOpen('Error occurred while marking salary as paid.');
@@ -91,7 +89,6 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
   // Delete salary and corresponding expense
   const handleDelete = async (salary) => {
     try {
-      // Delete associated expense (if exists) for the salary
       await supabase
         .from('expenses')
         .delete()
@@ -99,11 +96,10 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
         .eq('expense_type', 'Salary')
         .eq('amount', salary.net_salary);
 
-      // Delete salary
       await supabase.from('staff_salaries').delete().eq('id', salary.id);
 
       handleSnackbarOpen('Salary and associated expense deleted successfully.');
-      fetchSalaries(); // Refresh the salary list after deletion
+      fetchSalaries();
     } catch (error) {
       console.error('Error deleting salary or expense:', error);
       handleSnackbarOpen('Error occurred while deleting salary or expense.');
@@ -133,9 +129,11 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
         <TableHeader>
           <TableRow>
             <TableHead>Staff</TableHead>
-            <TableHead>Scheduled Date</TableHead>
+            <TableHead>Payment Date</TableHead>
             <TableHead>Base Salary</TableHead>
-            <TableHead>Advance Amount</TableHead>
+            <TableHead>Advance Taken</TableHead>
+            <TableHead>Bonuses</TableHead>
+            <TableHead>Total Deductions</TableHead>
             <TableHead>Net Salary</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
@@ -146,16 +144,16 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
             filteredSalaries.map((salary) => (
               <TableRow key={salary.id}>
                 <TableCell>{salary.staffs?.username || 'N/A'}</TableCell>
-                <TableCell>{format(parseISO(salary.scheduled_payment_date), 'yyyy-MM-dd')}</TableCell>
-                <TableCell>&#8377;{salary.salary_amount.toFixed(2)}</TableCell> {/* Rupee symbol corrected */}
-                <TableCell>&#8377;{salary.advance_amount.toFixed(2)}</TableCell>
+                <TableCell>{salary.payment_date ? format(parseISO(salary.payment_date), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                <TableCell>&#8377;{salary.base_salary.toFixed(2)}</TableCell>
+                <TableCell>&#8377;{salary.advance_taken.toFixed(2)}</TableCell>
+                <TableCell>&#8377;{salary.bonuses.toFixed(2)}</TableCell>
+                <TableCell>&#8377;{salary.total_deductions.toFixed(2)}</TableCell>
                 <TableCell>&#8377;{salary.net_salary.toFixed(2)}</TableCell>
                 <TableCell>{getStatusBadge(salary.status)}</TableCell>
                 <TableCell className="flex space-x-2">
-                  {/* Edit and Delete icons */}
-                 
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(salary)}>
-                    <Trash size={16} /> {/* Lucide Trash Icon */}
+                    <Trash size={16} />
                   </Button>
                   {salary.status !== 'Paid' && (
                     <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(salary)}>
@@ -167,7 +165,7 @@ const SalaryList = ({ salaries, onMarkAsPaid, onDelete, fetchSalaries }) => {
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={7} className="text-center">No salaries scheduled for the selected month.</TableCell>
+              <TableCell colSpan={9} className="text-center">No salaries scheduled for the selected month.</TableCell>
             </TableRow>
           )}
         </TableBody>

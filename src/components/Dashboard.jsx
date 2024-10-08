@@ -109,13 +109,11 @@ const Dashboard = () => {
     { name: 'Debts', value: dashboardStats.totalDebt, color: 'text-yellow-600', icon: <CurrencyRupee /> },
     { name: 'Total Memberships', value: dashboardStats.totalMemberships, color: 'text-muted-foreground', icon: <Users /> },
     { name: 'Active Memberships', value: dashboardStats.activeMemberships, color: 'text-green-600', icon: <Users /> },
-    
   ];
 
   return (
     <div className="mx-8 my-4">
       <h1 className="text-2xl font-bold mb-4">Dashboard Overview</h1>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
         {metrics.map((metric) => (
           <Card
@@ -131,15 +129,12 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${metric.color}`}>
-                ₹{metric.name === 'Total Income' || metric.name === 'Total Expenses' || metric.name === 'Credits' || metric.name === 'Debts'
-                  ? metric.value.toFixed(2)
-                  : metric.value}
+                ₹{metric.value.toFixed(2)}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
       <div className="bg-white shadow-lg rounded-lg p-6 min-h-[400px]">
         {renderMetricComponent()}
       </div>

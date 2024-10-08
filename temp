@@ -1,181 +1,281 @@
-see the functionalities in import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Pencil, Trash } from "lucide-react";
-import { supabase } from '../supabaseClient';  // Make sure to import your Supabase client
+  CardContent,
+} from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { Select, SelectTrigger, SelectContent, SelectItem } from '../components/ui/select';
+import { MoreVertical, Trash2, MessageCircle, Printer, FileText } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import Snackbar from '@mui/material/Snackbar';
+import MuiAlert from '@mui/material/Alert';
+import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
+import MembershipDialog from './MembershipDialog';
+import PrintBillDialog from './PrintBillDialog'; 
+import { supabase } from '../supabaseClient';
 
-function MembershipPlans({ membershipPlans, fetchMembershipPlans, showSnackbar }) {
-  const [openPlanDialog, setOpenPlanDialog] = useState(false);
-  const [planFormData, setPlanFormData] = useState({
-    id: null,
-    name: '',
-    duration_in_months: '',
-    base_price: '',
-  });
+// Alert Component for Snackbar
+const Alert = React.forwardRef((props, ref) => <MuiAlert elevation={6} ref={ref} {...props} />);
 
-  // Open dialog for creating or editing a plan
-  const handleOpenPlanDialog = (plan = null) => {
-    setPlanFormData(
-      plan || { id: null, name: '', duration_in_months: '', base_price: '' }
-    );
-    setOpenPlanDialog(true);
-  };
+function ExistingMemberships() {
+  const [memberships, setMemberships] = useState([]);
+  const [openMembershipDialog, setOpenMembershipDialog] = useState(false);
+  const [openPrintDialog, setOpenPrintDialog] = useState(false); // State for Print Dialog
+  const [selectedMembership, setSelectedMembership] = useState(null); // Selected membership for printing
+  const [todayIncome, setTodayIncome] = useState(0); // Total income for today
+  const [dateRange, setDateRange] = useState('today');
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const membershipsPerPage = 10;
 
-  const handleClosePlanDialog = () => {
-    setOpenPlanDialog(false);
-  };
+  useEffect(() => {
+    fetchMemberships();
+    calculateTodayIncome();
+  }, [dateRange, customFromDate, customToDate]);
 
-  // Handle form change
-  const handlePlanFormChange = (e) => {
-    const { name, value } = e.target;
-    setPlanFormData({ ...planFormData, [name]: value });
-  };
-
-  // Handle form submit (add or update)
-  const handlePlanFormSubmit = async () => {
+  const fetchMemberships = async () => {
     try {
-      if (planFormData.id) {
-        // Edit an existing plan
-        const { error } = await supabase
-          .from('membership_plans')
-          .update({
-            name: planFormData.name,
-            duration_in_months: planFormData.duration_in_months,
-            base_price: planFormData.base_price,
-          })
-          .eq('id', planFormData.id);
-        if (error) throw error;
-        showSnackbar('Plan updated successfully', 'success');
-      } else {
-        // Add a new plan
-        const { error } = await supabase.from('membership_plans').insert({
-          name: planFormData.name,
-          duration_in_months: planFormData.duration_in_months,
-          base_price: planFormData.base_price,
-        });
-        if (error) throw error;
-        showSnackbar('Plan created successfully', 'success');
+      const today = new Date().toISOString().split('T')[0];
+      let query = supabase.from('memberships').select(`
+        id,
+        user_id,
+        start_date,
+        end_date,
+        total_amount,
+        users (id, name, mobile_number_1),
+        membership_plans!memberships_membership_plan_id_fkey (id, name),
+        payment_modes (id, name)
+      `);
+
+      if (dateRange === 'today') {
+        query = query.eq('start_date', today);
+      } else if (dateRange === 'custom') {
+        query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
       }
-      fetchMembershipPlans();  // Refresh the list
-      handleClosePlanDialog();  // Close the dialog
+
+      const { data: membershipsData, error } = await query;
+      if (error) throw error;
+      setMemberships(membershipsData);
     } catch (error) {
-      showSnackbar('Error saving plan: ' + error.message, 'error');
+      console.error('Error fetching memberships:', error);
     }
   };
 
-  // Handle delete
-  const handleDeletePlan = async (id) => {
+  const calculateTodayIncome = async () => {
     try {
-      const { error } = await supabase
-        .from('membership_plans')
-        .delete()
-        .eq('id', id);
+      const today = new Date().toISOString().split('T')[0];
+      let query = supabase.from('memberships').select('total_amount');
+
+      if (dateRange === 'today') {
+        query = query.eq('start_date', today);
+      } else if (dateRange === 'custom') {
+        query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      showSnackbar('Plan deleted successfully', 'success');
-      fetchMembershipPlans();  // Refresh the list
+      const totalIncome = data.reduce((sum, membership) => sum + membership.total_amount, 0);
+      setTodayIncome(totalIncome);
     } catch (error) {
-      showSnackbar('Error deleting plan: ' + error.message, 'error');
+      console.error('Error calculating income:', error);
     }
+  };
+
+  const handleDeleteMembership = async (membershipId) => {
+    try {
+      const { error } = await supabase.from('memberships').delete().eq('id', membershipId);
+      if (error) throw error;
+      setSnackbarMessage("Membership deleted successfully.");
+      setSnackbarSeverity("success");
+      fetchMemberships();
+      calculateTodayIncome();
+    } catch (error) {
+      setSnackbarMessage(`Error: ${error.message}`);
+      setSnackbarSeverity("error");
+    } finally {
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleWhatsApp = (user, plan, startDate) => {
+    const message = `Hi ${user.name}, your purchase of the ${plan.name} plan on ${startDate} was successful! Thank you for being a member of Her Chamber Fitness.`;
+    window.open(`https://wa.me/${user.mobile_number_1}?text=${encodeURIComponent(message)}`);
+  };
+
+  const handlePrint = (membership) => {
+    setSelectedMembership(membership);
+    setOpenPrintDialog(true);
+  };
+
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Membership Report", 20, 10);
+    doc.text(`Total Income for Selected Period: ₹${todayIncome.toFixed(2)}`, 20, 20);
+
+    let yPos = 30;
+    memberships.forEach((membership) => {
+      doc.text(`User: ${membership.users.name}`, 20, yPos);
+      doc.text(`Plan: ${membership.membership_plans.name}`, 20, yPos + 10);
+      doc.text(`Start Date: ${membership.start_date}`, 20, yPos + 20);
+      doc.text(`End Date: ${membership.end_date}`, 20, yPos + 30);
+      doc.text(`Amount: ₹${membership.total_amount.toFixed(2)}`, 20, yPos + 40);
+      yPos += 50;
+    });
+
+    doc.save(`Membership_Report_${dateRange}.pdf`);
+  };
+
+  const totalPages = Math.ceil(memberships.length / membershipsPerPage);
+  const handlePageChange = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
   };
 
   return (
-    <Card className="mb-4">
+    <Card className="p-6">
       <CardHeader>
-        <CardTitle>Membership Plans</CardTitle>
-        <Button className="ml-auto" onClick={() => handleOpenPlanDialog()}>Create New Plan</Button>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="text-center">Duration (Months)</TableHead>
-              <TableHead className="text-center">Base Price (Rs)</TableHead>
-              <TableHead className="text-center">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {membershipPlans.map((plan) => (
-              <TableRow key={plan.id}>
-                <TableCell>{plan.name}</TableCell>
-                <TableCell className="text-center" >{plan.duration_in_months}</TableCell>
-                <TableCell className="text-center">Rs {plan.base_price}</TableCell>
-                <TableCell className="text-center">
-                  <Button variant="outline" onClick={() => handleOpenPlanDialog(plan)}>
-                    <Pencil className="h-4 w-4 mr-2" /> Edit
-                  </Button>
-                  <Button variant="destructive" onClick={() => handleDeletePlan(plan.id)} className="ml-2">
-                    <Trash className="h-4 w-4 mr-2" /> Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-
-      {/* Plan Dialog */}
-      <Dialog open={openPlanDialog} onOpenChange={setOpenPlanDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{planFormData.id ? 'Edit Membership Plan' : 'Create Membership Plan'}</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 gap-4 mt-4">
-            <Input
-              label="Plan Name"
-              placeholder="Enter plan name"
-              value={planFormData.name}
-              onChange={handlePlanFormChange}
-              name="name"
-              required
-            />
-            <Input
-              label="Duration (Months)"
-              placeholder="Enter duration in months"
-              type="number"
-              value={planFormData.duration_in_months}
-              onChange={handlePlanFormChange}
-              name="duration_in_months"
-              required
-            />
-            <Input
-              label="Base Price (Rs)"
-              placeholder="Enter base price"
-              type="number"
-              value={planFormData.base_price}
-              onChange={handlePlanFormChange}
-              name="base_price"
-              required
-            />
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-2xl">Existing Memberships</CardTitle>
+          <Button onClick={() => setOpenMembershipDialog(true)}>Add Membership</Button>
+        </div>
+        <div className="mt-4 flex justify-between items-center">
+          <div>
+            <Label>Total Income:</Label>
+            <p className="font-bold text-lg">₹ {todayIncome.toFixed(2)}</p>
           </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" onClick={handleClosePlanDialog}>Cancel</Button>
-            <Button className="ml-4" onClick={handlePlanFormSubmit}>
-              {planFormData.id ? 'Save Changes' : 'Create Plan'}
+          <div className="flex space-x-4">
+            <Select onValueChange={setDateRange} defaultValue={dateRange}>
+              <SelectTrigger>Date Range</SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            {dateRange === 'custom' && (
+              <>
+                <Input type="date" value={customFromDate} onChange={(e) => setCustomFromDate(e.target.value)} />
+                <Input type="date" value={customToDate} onChange={(e) => setCustomToDate(e.target.value)} />
+              </>
+            )}
+            <Button onClick={handleDownloadPDF}>
+              <FileText className="mr-2" /> Download Report
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <div className="max-h-96 overflow-y-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Mode</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount (₹)</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {memberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage).map((membership) => (
+                <tr key={membership.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.users.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plans.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.end_date}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">₹ {membership.total_amount.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end space-x-2">
+                    <Printer
+                      className="cursor-pointer text-gray-600 hover:text-gray-800 w-4 h-4"
+                      onClick={() => handlePrint(membership)}
+                    />
+                    <MessageCircle
+                      className="text-green-500 cursor-pointer hover:text-green-700 w-4 h-4"
+                      onClick={() => handleWhatsApp(membership.users, membership.membership_plans, membership.start_date)}
+                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDeleteMembership(membership.id)}>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))}
+              {memberships.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="px-6 py-4 text-center">
+                    No memberships found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 flex justify-between">
+          <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
+            Previous
+          </Button>
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>
+            Next
+          </Button>
+        </div>
+      </CardContent>
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
+      <MembershipDialog open={openMembershipDialog} onClose={() => setOpenMembershipDialog(false)} refreshData={fetchMemberships} />
+
+      {/* PrintBillDialog for printing selected membership */}
+      {selectedMembership && (
+        <PrintBillDialog
+          open={openPrintDialog}
+          onClose={() => setOpenPrintDialog(false)}
+          membership={selectedMembership}
+        />
+      )}
     </Card>
   );
 }
 
-export default MembershipPlans; , i want to create such a component for madding memberships , when meberships are added or edited income should chnage accordingly , the tables i have are , create table
+export default ExistingMemberships; , existing memberships are not displayed properly , fix ,  table
   public.memberships (
     id serial not null,
     user_id integer not null,
@@ -198,42 +298,8 @@ export default MembershipPlans; , i want to create such a component for madding 
     constraint memberships_membership_plan_id_fkey foreign key (membership_plan_id) references membership_plans (id),
     constraint memberships_payment_mode_id_fkey foreign key (payment_mode_id) references payment_modes (id),
     constraint memberships_user_id_fkey foreign key (user_id) references users (id)
-  ) tablespace pg_default; , create table
-  public.membership_plans (
-    id serial not null,
-    name text not null,
-    duration_in_days integer null,
-    base_price numeric not null,
-    type text not null,
-    class_type text null,
-    additional_services text null,
-    created_at timestamp with time zone null default now(),
-    number_of_people integer null,
-    constraint membership_plans_pkey primary key (id)
-  ) tablespace pg_default; , create table
-  public.users (
-    id serial not null,
-    user_id text not null,
-    name character varying(255) not null,
-    email character varying(255) not null,
-    date_of_birth date null,
-    blood_group character varying null,
-    medical_conditions text null,
-    created_at timestamp with time zone not null,
-    updated_at timestamp with time zone null,
-    mobile_number_1 text not null,
-    active boolean null default false,
-    subscription_end date null,
-    mobile_number_2 character varying(15) null,
-    emergency_contact_number character varying(15) null,
-    allergies text null,
-    injuries text null,
-    current_medications text null,
-    fitness_goals text null,
-    role character varying(50) null,
-    constraint users_pkey primary key (id),
-    constraint users_email_unique unique (email),
-    constraint users_user_id_key unique (user_id)
   ) tablespace pg_default;
 
-  fix and give full code for the new table remeber that the Membership Plan and might have 
+create trigger membership_income_trigger
+after insert on memberships for each row
+execute function add_income_from_membership ();  , is my table structure 

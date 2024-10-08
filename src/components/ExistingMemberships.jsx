@@ -24,9 +24,9 @@ const Alert = React.forwardRef((props, ref) => <MuiAlert elevation={6} ref={ref}
 function ExistingMemberships() {
   const [memberships, setMemberships] = useState([]);
   const [openMembershipDialog, setOpenMembershipDialog] = useState(false);
-  const [openPrintDialog, setOpenPrintDialog] = useState(false); // State for Print Dialog
-  const [selectedMembership, setSelectedMembership] = useState(null); // Selected membership for printing
-  const [todayIncome, setTodayIncome] = useState(0); // Total income for today
+  const [openPrintDialog, setOpenPrintDialog] = useState(false);
+  const [selectedMembership, setSelectedMembership] = useState(null);
+  const [todayIncome, setTodayIncome] = useState(0);
   const [dateRange, setDateRange] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
@@ -51,13 +51,15 @@ function ExistingMemberships() {
         end_date,
         total_amount,
         users (id, name, mobile_number_1),
-        membership_plans!memberships_membership_plan_id_fkey (id, name),
+        membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
+        admission_plan:membership_plans!memberships_admission_plan_id_fkey (id, name),
+        additional_service_plan:membership_plans!memberships_additional_service_plan_id_fkey (id, name),
         payment_modes (id, name)
       `);
 
       if (dateRange === 'today') {
         query = query.eq('start_date', today);
-      } else if (dateRange === 'custom') {
+      } else if (dateRange === 'custom' && customFromDate && customToDate) {
         query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
       }
 
@@ -65,7 +67,7 @@ function ExistingMemberships() {
       if (error) throw error;
       setMemberships(membershipsData);
     } catch (error) {
-      console.error('Error fetching memberships:', error);
+      console.error('Error fetching memberships:', error.message);
     }
   };
 
@@ -76,7 +78,7 @@ function ExistingMemberships() {
 
       if (dateRange === 'today') {
         query = query.eq('start_date', today);
-      } else if (dateRange === 'custom') {
+      } else if (dateRange === 'custom' && customFromDate && customToDate) {
         query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
       }
 
@@ -85,7 +87,7 @@ function ExistingMemberships() {
       const totalIncome = data.reduce((sum, membership) => sum + membership.total_amount, 0);
       setTodayIncome(totalIncome);
     } catch (error) {
-      console.error('Error calculating income:', error);
+      console.error('Error calculating income:', error.message);
     }
   };
 
@@ -123,7 +125,7 @@ function ExistingMemberships() {
     let yPos = 30;
     memberships.forEach((membership) => {
       doc.text(`User: ${membership.users.name}`, 20, yPos);
-      doc.text(`Plan: ${membership.membership_plans.name}`, 20, yPos + 10);
+      doc.text(`Plan: ${membership.membership_plan.name}`, 20, yPos + 10);
       doc.text(`Start Date: ${membership.start_date}`, 20, yPos + 20);
       doc.text(`End Date: ${membership.end_date}`, 20, yPos + 30);
       doc.text(`Amount: ₹${membership.total_amount.toFixed(2)}`, 20, yPos + 40);
@@ -197,7 +199,7 @@ function ExistingMemberships() {
               {memberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage).map((membership) => (
                 <tr key={membership.id}>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.users.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plans.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plan.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.start_date}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.end_date}</td>
@@ -209,7 +211,7 @@ function ExistingMemberships() {
                     />
                     <MessageCircle
                       className="text-green-500 cursor-pointer hover:text-green-700 w-4 h-4"
-                      onClick={() => handleWhatsApp(membership.users, membership.membership_plans, membership.start_date)}
+                      onClick={() => handleWhatsApp(membership.users, membership.membership_plan, membership.start_date)}
                     />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -263,7 +265,6 @@ function ExistingMemberships() {
 
       <MembershipDialog open={openMembershipDialog} onClose={() => setOpenMembershipDialog(false)} refreshData={fetchMemberships} />
 
-      {/* PrintBillDialog for printing selected membership */}
       {selectedMembership && (
         <PrintBillDialog
           open={openPrintDialog}

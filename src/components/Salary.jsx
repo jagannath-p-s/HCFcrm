@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import SalaryForm from './SalaryForm';
 import SalaryList from './SalaryList';
 import AdvancesComponent from './AdvancesComponent';
@@ -25,10 +25,14 @@ const Salary = () => {
   // Fetch staff data
   const fetchStaffs = async () => {
     const { data, error } = await supabase.from('staffs').select('*');
-    if (!error) setStaffs(data);
+    if (error) {
+      console.error('Error fetching staffs:', error);
+    } else {
+      setStaffs(data);
+    }
   };
 
-  // Fetch salary data based on the selected month
+  // Fetch salary data directly from staff_salaries with all fields and staff username
   const fetchSalaries = async () => {
     const [year, month] = selectedMonth.split('-');
     const startDate = startOfMonth(new Date(year, month - 1));
@@ -36,17 +40,25 @@ const Salary = () => {
 
     const { data, error } = await supabase
       .from('staff_salaries')
-      .select('*, staffs(username)')
-      .gte('scheduled_payment_date', startDate.toISOString())
-      .lte('scheduled_payment_date', endDate.toISOString());
+      .select('id, staff_id, base_salary, advance_taken, manual_deduction, total_deductions, net_salary, payment_date, bonuses, remarks, staffs (username)')
+      .gte('payment_date', startDate.toISOString())
+      .lte('payment_date', endDate.toISOString());
 
-    if (!error) setSalaries(data);
+    if (error) {
+      console.error('Error fetching salaries:', error);
+    } else {
+      setSalaries(data);
+    }
   };
 
   // Fetch advance data
   const fetchAdvances = async () => {
     const { data, error } = await supabase.from('advances').select('*');
-    if (!error) setAdvances(data);
+    if (error) {
+      console.error('Error fetching advances:', error);
+    } else {
+      setAdvances(data);
+    }
   };
 
   // Refresh the salary list after adding a salary
@@ -63,20 +75,28 @@ const Salary = () => {
   // Mark a salary as paid and refresh the salary list
   const handleMarkAsPaid = async (salary) => {
     const { error } = await supabase.from('staff_salaries').update({ status: 'Paid' }).eq('id', salary.id);
-    if (!error) fetchSalaries();
+    if (error) {
+      console.error('Error marking salary as paid:', error);
+    } else {
+      fetchSalaries();
+    }
   };
 
   // Delete a salary and refresh the salary list
   const handleDeleteSalary = async (salaryId) => {
     const { error } = await supabase.from('staff_salaries').delete().eq('id', salaryId);
-    if (!error) fetchSalaries(); // Refresh the list after deletion
+    if (error) {
+      console.error('Error deleting salary:', error);
+    } else {
+      fetchSalaries();
+    }
   };
 
   // Generate month-year options for the dropdown
   const generateMonthYearOptions = () => {
     const options = [];
     const currentYear = new Date().getFullYear();
-    const years = [currentYear - 1, currentYear, currentYear + 1]; // For example, allow selection for 3 years (past, current, future)
+    const years = [currentYear - 1, currentYear, currentYear + 1]; // Allow selection for 3 years: past, current, future
 
     years.forEach((year) => {
       for (let month = 0; month < 12; month++) {
@@ -90,20 +110,33 @@ const Salary = () => {
 
   return (
     <div className="p-4">
+      {/* Month-Year Selection */}
+      <div className="mb-4">
+        <label className="text-sm font-medium">Select Month</label>
+        <Select value={selectedMonth} onValueChange={(value) => setSelectedMonth(value)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select Month" />
+          </SelectTrigger>
+          <SelectContent>
+            {generateMonthYearOptions().map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Salary Management */}
       <Card className="mb-8">
         <CardHeader className="flex justify-between">
           <CardTitle>Salary Management</CardTitle>
-          
         </CardHeader>
         <CardContent>
-          {/* Form to add or edit salary */}
           <SalaryForm staffs={staffs} onSalaryAdded={handleSalaryAdded} />
-          {/* List of salaries */}
           <SalaryList
             salaries={salaries}
-            onMarkAsPaid={handleMarkAsPaid}
-            onDeleteSalary={handleDeleteSalary}
+            fetchSalaries={fetchSalaries}
           />
         </CardContent>
       </Card>
@@ -114,7 +147,6 @@ const Salary = () => {
           <CardTitle>Advances Given</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Component to manage advances */}
           <AdvancesComponent staffs={staffs} onAdvanceAdded={handleAdvanceAdded} />
         </CardContent>
       </Card>
