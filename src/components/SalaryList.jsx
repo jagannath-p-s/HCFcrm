@@ -195,4 +195,5 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
   );
 };
 
+
 export default SalaryList;
