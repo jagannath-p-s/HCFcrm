@@ -1,25 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { format, parseISO } from 'date-fns';
-import { Trash } from 'lucide-react';
 import Snackbar from '@mui/material/Snackbar';
 import SnackbarContent from '@mui/material/SnackbarContent';
+import { Trash } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '../supabaseClient';
 
-const SalaryList = ({ salaries, fetchSalaries }) => {
+const SalaryList = () => {
+  const [salaries, setSalaries] = useState([]);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  // Filter salaries based on the selected month
-  const filteredSalaries = salaries.filter((salary) => {
-    const paymentDate = salary.payment_date ? parseISO(salary.payment_date) : null;
-    const formattedDate = paymentDate ? format(paymentDate, 'yyyy-MM') : '';
-    return formattedDate === filterMonth;
-  });
+  useEffect(() => {
+    fetchSalaries();
+  }, [filterMonth]);
+
+  const fetchSalaries = async () => {
+    try {
+      const [year, month] = filterMonth.split('-');
+      const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
+      const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('staff_salaries')
+        .select('*, staffs (username)')
+        .gte('payment_date', startDate)
+        .lte('payment_date', endDate);
+
+      if (error) throw error;
+      setSalaries(data || []);
+    } catch (error) {
+      console.error('Error fetching salaries:', error);
+      handleSnackbarOpen('Error fetching salaries');
+    }
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -39,10 +57,53 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
 
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
-    setSnackbarMessage('');
   };
 
-  // Generate month-year options for the dropdown
+  const handleMarkAsPaid = async (salary) => {
+    try {
+      await supabase
+        .from('staff_salaries')
+        .update({ status: 'Paid' })
+        .eq('id', salary.id);
+
+      await supabase.from('expenses').insert([
+        {
+          amount: salary.net_salary,
+          description: `Salary payment for ${salary.staffs?.username}`,
+          expense_date: new Date().toISOString(),
+          staff_id: salary.staff_id,
+          status: 'paid',
+          expense_type: 'Salary',
+        },
+      ]);
+
+      handleSnackbarOpen('Salary marked as paid and expense created.');
+      fetchSalaries();
+    } catch (error) {
+      console.error('Error marking salary as paid or creating expense:', error);
+      handleSnackbarOpen('Error occurred while marking salary as paid.');
+    }
+  };
+
+  const handleDelete = async (salary) => {
+    try {
+      await supabase
+        .from('expenses')
+        .delete()
+        .eq('staff_id', salary.staff_id)
+        .eq('expense_type', 'Salary')
+        .eq('amount', salary.net_salary);
+
+      await supabase.from('staff_salaries').delete().eq('id', salary.id);
+
+      handleSnackbarOpen('Salary and associated expense deleted successfully.');
+      fetchSalaries();
+    } catch (error) {
+      console.error('Error deleting salary or expense:', error);
+      handleSnackbarOpen('Error occurred while deleting salary or expense.');
+    }
+  };
+
   const generateMonthYearOptions = () => {
     const options = [];
     const currentYear = new Date().getFullYear();
@@ -58,62 +119,9 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
     return options;
   };
 
-  // Mark salary as paid and create an expense for it
-  const handleMarkAsPaid = async (salary) => {
-    try {
-      // Update the salary status to 'Paid'
-      await supabase
-        .from('staff_salaries')
-        .update({ status: 'Paid' })
-        .eq('id', salary.id);
-
-      // Insert the expense record for the salary payment
-      await supabase.from('expenses').insert([
-        {
-          amount: salary.net_salary,
-          description: `Salary payment for ${salary.staffs?.username}`,
-          expense_date: new Date().toISOString(),
-          category_id: null, // Set category if applicable
-          staff_id: salary.staff_id,
-          status: 'Paid',
-          expense_type: 'Salary',
-        },
-      ]);
-
-      handleSnackbarOpen('Salary marked as paid and expense created.');
-      fetchSalaries();
-    } catch (error) {
-      console.error('Error marking salary as paid or creating expense:', error);
-      handleSnackbarOpen('Error occurred while marking salary as paid.');
-    }
-  };
-
-  // Delete salary and the corresponding expense entry
-  const handleDelete = async (salary) => {
-    try {
-      // Delete associated expense first
-      await supabase
-        .from('expenses')
-        .delete()
-        .eq('staff_id', salary.staff_id)
-        .eq('expense_type', 'Salary')
-        .eq('amount', salary.net_salary);
-
-      // Delete the salary entry
-      await supabase.from('staff_salaries').delete().eq('id', salary.id);
-
-      handleSnackbarOpen('Salary and associated expense deleted successfully.');
-      fetchSalaries();
-    } catch (error) {
-      console.error('Error deleting salary or expense:', error);
-      handleSnackbarOpen('Error occurred while deleting salary or expense.');
-    }
-  };
-
   return (
     <>
       <div className="flex justify-between items-center mb-4 mt-4">
-        {/* Month Filter Dropdown */}
         <Select value={filterMonth} onValueChange={(value) => setFilterMonth(value)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Select Month" />
@@ -128,7 +136,6 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
         </Select>
       </div>
 
-      {/* Salary Table */}
       <Table>
         <TableHeader>
           <TableRow>
@@ -144,16 +151,16 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredSalaries.length > 0 ? (
-            filteredSalaries.map((salary) => (
+          {salaries.length > 0 ? (
+            salaries.map((salary) => (
               <TableRow key={salary.id}>
                 <TableCell>{salary.staffs?.username || 'N/A'}</TableCell>
                 <TableCell>{salary.payment_date ? format(parseISO(salary.payment_date), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                <TableCell>&#8377;{salary.base_salary.toFixed(2)}</TableCell>
-                <TableCell>&#8377;{salary.advance_taken.toFixed(2)}</TableCell>
-                <TableCell>&#8377;{salary.bonuses.toFixed(2)}</TableCell>
-                <TableCell>&#8377;{salary.total_deductions.toFixed(2)}</TableCell>
-                <TableCell>&#8377;{salary.net_salary.toFixed(2)}</TableCell>
+                <TableCell>&#8377;{Number(salary.base_salary).toFixed(2)}</TableCell>
+                <TableCell>&#8377;{Number(salary.advance_taken).toFixed(2)}</TableCell>
+                <TableCell>&#8377;{Number(salary.bonuses).toFixed(2)}</TableCell>
+                <TableCell>&#8377;{Number(salary.total_deductions).toFixed(2)}</TableCell>
+                <TableCell>&#8377;{Number(salary.net_salary).toFixed(2)}</TableCell>
                 <TableCell>{getStatusBadge(salary.status)}</TableCell>
                 <TableCell className="flex space-x-2">
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(salary)}>
@@ -169,13 +176,12 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={9} className="text-center">No salaries scheduled for the selected month.</TableCell>
+              <TableCell colSpan={9} className="text-center">No salaries available.</TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
 
-      {/* Snackbar for Success/Error messages */}
       <Snackbar
         open={snackbarOpen}
         onClose={handleSnackbarClose}
@@ -194,6 +200,5 @@ const SalaryList = ({ salaries, fetchSalaries }) => {
     </>
   );
 };
-
 
 export default SalaryList;

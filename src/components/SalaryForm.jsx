@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
@@ -17,30 +17,39 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [availableStaffs, setAvailableStaffs] = useState(staffs);
+
+  useEffect(() => {
+    if (!staffs || staffs.length === 0) {
+      fetchStaffs();
+    }
+  }, []);
+
+  const fetchStaffs = async () => {
+    try {
+      const { data, error } = await supabase.from('staffs').select('id, username, salary');
+      if (error) throw error;
+      setAvailableStaffs(data);
+    } catch (error) {
+      console.error('Error fetching staff:', error.message);
+      showSnackbar('Error fetching staff list', 'error');
+    }
+  };
 
   const handleStaffSelect = async (staffId) => {
-    try {
-      setFormData({ ...formData, staff_id: staffId });
-      
-      // Fetch the base salary for the selected staff member
-      const { data, error } = await supabase
-        .from('staffs')
-        .select('salary')
-        .eq('id', staffId)
-        .single();
-
-      if (error) throw error;
-
-      setFormData({ ...formData, staff_id: staffId, salary_amount: data.salary });
-    } catch (error) {
-      console.error('Error fetching staff salary:', error.message);
-      showSnackbar('Error fetching staff salary', 'error');
+    const selectedStaff = availableStaffs.find((staff) => staff.id.toString() === staffId);
+    if (selectedStaff) {
+      setFormData((prevData) => ({
+        ...prevData,
+        staff_id: staffId,
+        salary_amount: selectedStaff.salary || 0,
+      }));
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prevData) => ({ ...prevData, [name]: value }));
   };
 
   const handleAddSalary = async () => {
@@ -50,7 +59,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
       const bonuses = parseFloat(formData.bonuses || 0);
       const netSalary = baseSalary + bonuses - deductions;
 
-      const { data, error } = await supabase.from('staff_salaries').insert([
+      const { error } = await supabase.from('staff_salaries').insert([
         {
           staff_id: formData.staff_id,
           base_salary: baseSalary,
@@ -102,11 +111,17 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
                   <SelectValue placeholder="Select Staff" />
                 </SelectTrigger>
                 <SelectContent>
-                  {staffs.map((staff) => (
-                    <SelectItem key={staff.id} value={staff.id.toString()}>
-                      {staff.username}
+                  {availableStaffs.length > 0 ? (
+                    availableStaffs.map((staff) => (
+                      <SelectItem key={staff.id} value={staff.id.toString()}>
+                        {staff.username}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>
+                      No Staff Available
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
             </div>
