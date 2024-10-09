@@ -59,12 +59,13 @@ function ExistingMemberships() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [searchId, setSearchId] = useState(''); // New state for Membership ID search
   const membershipsPerPage = 10;
 
   useEffect(() => {
     fetchMemberships();
     calculateTodayIncome();
-  }, [dateRange, customFromDate, customToDate]);
+  }, [dateRange, customFromDate, customToDate, searchId]);
 
   const fetchMemberships = async () => {
     try {
@@ -87,6 +88,10 @@ function ExistingMemberships() {
         query = query.eq('start_date', today);
       } else if (dateRange === 'custom' && customFromDate && customToDate) {
         query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+      }
+
+      if (searchId) {
+        query = query.eq('id', searchId);
       }
 
       const { data: membershipsData, error } = await query;
@@ -145,15 +150,12 @@ function ExistingMemberships() {
 
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
-
-    // Set the document title with underline
     doc.setFont("times", "bold");
     doc.setFontSize(24);
     doc.text("Membership Report", 20, 30);
     doc.setLineWidth(0.5);
     doc.line(20, 33, 200, 33);
 
-    // Add the date range and total income as a subheading
     const startDate = dateRange === 'custom' && customFromDate ? formatIndianDate(customFromDate) : '';
     const endDate = dateRange === 'custom' && customToDate ? formatIndianDate(customToDate) : '';
     const dateRangeText = dateRange === 'custom' ? `${startDate} - ${endDate}` : 'Today';
@@ -163,9 +165,9 @@ function ExistingMemberships() {
     doc.text(`Total Income for Selected Period: ${todayIncome.toFixed(2)}`, 20, 45);
     doc.text(`Time Period: ${dateRangeText}`, 20, 55);
 
-    // Prepare data for the table with created_at included
     const tableData = memberships.map((membership, index) => ([
         index + 1,
+        membership.id,
         membership.users.name,
         membership.membership_plan.name,
         formatIndianDate(membership.start_date),
@@ -175,9 +177,9 @@ function ExistingMemberships() {
         `${membership.total_amount.toFixed(2)}`
     ]));
 
-    // Define the table columns
     const tableColumns = [
         { header: "S.No", dataKey: "sno" },
+        { header: "Membership ID", dataKey: "id" },
         { header: "User", dataKey: "user" },
         { header: "Plan", dataKey: "plan" },
         { header: "Start Date", dataKey: "startDate" },
@@ -187,7 +189,6 @@ function ExistingMemberships() {
         { header: "Amount", dataKey: "amount" }
     ];
 
-    // Use autoTable to add the table to the PDF
     doc.autoTable({
         startY: 65,
         head: [tableColumns.map(col => col.header)],
@@ -204,113 +205,27 @@ function ExistingMemberships() {
             lineWidth: 0.1,
         },
         headStyles: {
-            fillColor: [245, 245, 245], // Light gray for header background
-            textColor: [100, 100, 100], // Darker gray text
+            fillColor: [245, 245, 245],
+            textColor: [100, 100, 100],
             fontStyle: 'bold',
             halign: 'left',
             fontSize: 12,
         },
         alternateRowStyles: {
-            fillColor: [255, 255, 255] // White background for alternate rows
+            fillColor: [255, 255, 255]
         },
         columnStyles: {
-            0: { halign: 'center' }, // Center-align S.No column
-            7: { halign: 'right' } // Right-align Amount column
+            0: { halign: 'center' },
+            8: { halign: 'right' }
         },
         theme: 'grid',
         didDrawPage: function (data) {
-            // Add footer with page number
             const pageCount = doc.internal.getNumberOfPages();
             doc.setFontSize(10);
             doc.text(`Page ${data.pageNumber} of ${pageCount}`, 105, 290, { align: 'center' });
         }
     });
 
-    // Save the PDF with a formatted date
-    const formattedDate = formatIndianDate(new Date().toISOString());
-    doc.save(`Membership_Report_${formattedDate}.pdf`);
-};
-
-  const getDateRangeText = () => {
-    if (dateRange === 'custom') {
-      const startDate = customFromDate ? formatIndianDate(customFromDate) : '';
-      const endDate = customToDate ? formatIndianDate(customToDate) : '';
-      return `${startDate} - ${endDate}`;
-    }
-    return 'Today';
-  };
-  
-  const addMembershipTable = (doc) => {
-    const tableData = prepareMembershipData();
-    const tableColumns = defineTableColumns();
-    
-    doc.autoTable({
-      startY: 65,
-      head: [tableColumns.map(col => col.header)],
-      body: tableData,
-      ...tableStyles,
-      didDrawPage: addPageNumber
-    });
-  };
-  
-  const prepareMembershipData = () => 
-    memberships.map((membership, index) => ([
-      index + 1,
-      membership.users.name,
-      membership.membership_plan.name,
-      formatIndianDate(membership.start_date),
-      formatIndianDate(membership.end_date),
-      formatIndianDate(membership.users.date_of_birth),
-      formatIndianDateTime(membership.created_at),
-      `₹${membership.total_amount.toFixed(2)}`
-    ]));
-  
-  const defineTableColumns = () => [
-    { header: "S.No", dataKey: "sno", width: 15 },
-    { header: "User", dataKey: "user", width: 35 },
-    { header: "Plan", dataKey: "plan", width: 30 },
-    { header: "Start Date", dataKey: "startDate", width: 25 },
-    { header: "End Date", dataKey: "endDate", width: 25 },
-    { header: "DOB", dataKey: "dob", width: 25 },
-    { header: "Created At", dataKey: "createdAt", width: 35 },
-    { header: "Amount ", dataKey: "amount", width: 25 }
-  ];
-  
-  const tableStyles = {
-    styles: {
-      fontSize: 11,
-      cellPadding: 5,
-      halign: 'center',
-      valign: 'middle',
-      overflow: 'linebreak',
-      minCellHeight: 10,
-      textColor: [0, 0, 0],
-      lineColor: [200, 200, 200],
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: [0, 0, 0],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      halign: 'center',
-    },
-    alternateRowStyles: {
-      fillColor: [240, 240, 240]
-    },
-    columnStyles: {
-      0: { halign: 'center' },
-      7: { halign: 'right' }
-    },
-    theme: 'grid',
-  };
-  
-  const addPageNumber = (data) => {
-    const pageCount = data.doc.internal.getNumberOfPages();
-    data.doc.setFontSize(10);
-    data.doc.text(`Page ${data.pageNumber} of ${pageCount}`, 105, 290, { align: 'center' });
-  };
-  
-  const savePDF = (doc) => {
     const formattedDate = formatIndianDate(new Date().toISOString());
     doc.save(`Membership_Report_${formattedDate}.pdf`);
   };
@@ -362,10 +277,19 @@ function ExistingMemberships() {
       </CardHeader>
 
       <CardContent>
+        <div className="mb-4">
+          <Input
+            type="text"
+            placeholder="Search by Membership ID"
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+          />
+        </div>
         <div className="max-h-96 overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Membership ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
@@ -379,6 +303,7 @@ function ExistingMemberships() {
             <tbody className="bg-white divide-y divide-gray-200">
               {memberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage).map((membership) => (
                 <tr key={membership.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">{membership.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.users.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.users.date_of_birth)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plan.name}</td>
@@ -413,7 +338,7 @@ function ExistingMemberships() {
               ))}
               {memberships.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="px-6 py-4 text-center">
+                  <td colSpan="9" className="px-6 py-4 text-center">
                     No memberships found.
                   </td>
                 </tr>
