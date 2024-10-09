@@ -7,22 +7,32 @@ import {
 } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import 'jspdf-autotable';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
-import { Select, SelectTrigger, SelectContent, SelectItem } from '../components/ui/select';
-import { MoreVertical, Trash2, MessageCircle, Printer, FileText } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+} from '../components/ui/select';
+import { MoreVertical, Trash2, MessageCircle, Printer, Edit3 } from 'lucide-react';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert from '@mui/material/Alert';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import MembershipDialog from './MembershipDialog';
-import PrintBillDialog from './PrintBillDialog'; 
+import PrintBillDialog from './PrintBillDialog';
 import { supabase } from '../supabaseClient';
+import DownloadMemberships from './DownloadMemberships';
 
-// Alert Component for Snackbar
-const Alert = React.forwardRef((props, ref) => <MuiAlert elevation={6} ref={ref} {...props} />);
+const Alert = React.forwardRef(function Alert(props, ref) {
+  return <MuiAlert elevation={6} ref={ref} {...props} />;
+});
 
-// Utility function to format date to DD-MM-YYYY
 const formatIndianDate = (date) => {
   if (!date) return '';
   return new Intl.DateTimeFormat('en-IN', {
@@ -32,66 +42,103 @@ const formatIndianDate = (date) => {
   }).format(new Date(date));
 };
 
-// Utility function to format date and time in Indian format (DD-MM-YYYY HH:MM)
-const formatIndianDateTime = (dateTime) => {
-  if (!dateTime) return '';
-  const options = {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  };
-  return new Intl.DateTimeFormat('en-IN', options).format(new Date(dateTime));
-};
-
 function ExistingMemberships() {
   const [memberships, setMemberships] = useState([]);
   const [openMembershipDialog, setOpenMembershipDialog] = useState(false);
   const [openPrintDialog, setOpenPrintDialog] = useState(false);
   const [selectedMembership, setSelectedMembership] = useState(null);
   const [todayIncome, setTodayIncome] = useState(0);
-  const [dateRange, setDateRange] = useState('today');
+  const [dateRange, setDateRange] = useState('all'); // Changed default to 'all'
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
-  const [searchId, setSearchId] = useState(''); // New state for Membership ID search
-  const membershipsPerPage = 10;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entriesPerPage, setEntriesPerPage] = useState(25);
+  const [editingRemarkId, setEditingRemarkId] = useState(null);
+  const [remarkInput, setRemarkInput] = useState('');
+  const entriesOptions = [25, 50, 75, 100];
+  const dateFilterOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'Today', value: 'today' },
+    { label: 'This Week', value: 'week' },
+    { label: 'This Month', value: 'month' },
+    { label: 'This Year', value: 'year' },
+    { label: 'Custom Range', value: 'custom' },
+  ];
 
   useEffect(() => {
     fetchMemberships();
     calculateTodayIncome();
-  }, [dateRange, customFromDate, customToDate, searchId]);
+  }, [dateRange, customFromDate, customToDate, searchTerm, entriesPerPage, currentPage]);
 
   const fetchMemberships = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      let query = supabase.from('memberships').select(`
-        id,
-        user_id,
-        start_date,
-        end_date,
-        total_amount,
-        created_at,
-        users (id, name, mobile_number_1, date_of_birth),
-        membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
-        admission_plan:membership_plans!memberships_admission_plan_id_fkey (id, name),
-        additional_service_plan:membership_plans!memberships_additional_service_plan_id_fkey (id, name),
-        payment_modes (id, name)
-      `);
+      const today = new Date();
+      let startOfYear = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
 
-      if (dateRange === 'today') {
-        query = query.eq('start_date', today);
-      } else if (dateRange === 'custom' && customFromDate && customToDate) {
-        query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+      let query = supabase
+        .from('memberships')
+        .select(
+          `
+          id,
+          user_id,
+          start_date,
+          end_date,
+          total_amount,
+          remarks,
+          created_at,
+          users (
+            id,
+            name,
+            mobile_number_1,
+            date_of_birth,
+            active
+          ),
+          membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
+          payment_modes (id, name)
+        `
+        );
+
+      // Remove users.active filter or make it optional
+      // query = query.eq('users.active', true);
+
+      // Date filters
+      if (dateRange !== 'all') {
+        if (dateRange === 'today') {
+          query = query.eq('start_date', today.toISOString().split('T')[0]);
+        } else if (dateRange === 'week') {
+          let startOfWeek = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() - today.getDay()
+          )
+            .toISOString()
+            .split('T')[0];
+          query = query.gte('start_date', startOfWeek);
+        } else if (dateRange === 'month') {
+          let startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+            .toISOString()
+            .split('T')[0];
+          query = query.gte('start_date', startOfMonth);
+        } else if (dateRange === 'year') {
+          query = query.gte('start_date', startOfYear);
+        } else if (dateRange === 'custom' && customFromDate && customToDate) {
+          query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+        }
       }
 
-      if (searchId) {
-        query = query.eq('id', searchId);
+      // Check if searchTerm is a numeric value
+      if (searchTerm) {
+        if (/^\d+$/.test(searchTerm)) {
+          // If searchTerm is numeric
+          query = query.eq('id', parseInt(searchTerm, 10));
+        } else {
+          // If searchTerm is not numeric
+          query = query.ilike('users.name', `%${searchTerm}%`);
+        }
       }
 
       const { data: membershipsData, error } = await query;
@@ -107,10 +154,31 @@ function ExistingMemberships() {
       const today = new Date().toISOString().split('T')[0];
       let query = supabase.from('memberships').select('total_amount');
 
-      if (dateRange === 'today') {
-        query = query.eq('start_date', today);
-      } else if (dateRange === 'custom' && customFromDate && customToDate) {
-        query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+      if (dateRange !== 'all') {
+        if (dateRange === 'today') {
+          query = query.eq('start_date', today);
+        } else if (dateRange === 'week') {
+          let startOfWeek = new Date(
+            new Date().getFullYear(),
+            new Date().getMonth(),
+            new Date().getDate() - new Date().getDay()
+          )
+            .toISOString()
+            .split('T')[0];
+          query = query.gte('start_date', startOfWeek);
+        } else if (dateRange === 'month') {
+          let startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+            .toISOString()
+            .split('T')[0];
+          query = query.gte('start_date', startOfMonth);
+        } else if (dateRange === 'year') {
+          let startOfYear = new Date(new Date().getFullYear(), 0, 1)
+            .toISOString()
+            .split('T')[0];
+          query = query.gte('start_date', startOfYear);
+        } else if (dateRange === 'custom' && customFromDate && customToDate) {
+          query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
+        }
       }
 
       const { data, error } = await query;
@@ -122,25 +190,45 @@ function ExistingMemberships() {
     }
   };
 
+  const handleUpdateRemark = async (membershipId) => {
+    try {
+      const { error } = await supabase
+        .from('memberships')
+        .update({ remarks: remarkInput })
+        .eq('id', membershipId);
+
+      if (error) throw error;
+      setSnackbarMessage('Remark updated successfully.');
+      setSnackbarSeverity('success');
+      fetchMemberships();
+    } catch (error) {
+      setSnackbarMessage(`Error updating remark: ${error.message}`);
+      setSnackbarSeverity('error');
+    } finally {
+      setEditingRemarkId(null);
+      setSnackbarOpen(true);
+    }
+  };
+
   const handleDeleteMembership = async (membershipId) => {
     try {
       const { error } = await supabase.from('memberships').delete().eq('id', membershipId);
       if (error) throw error;
-      setSnackbarMessage("Membership deleted successfully.");
-      setSnackbarSeverity("success");
+      setSnackbarMessage('Membership deleted successfully.');
+      setSnackbarSeverity('success');
       fetchMemberships();
       calculateTodayIncome();
     } catch (error) {
       setSnackbarMessage(`Error: ${error.message}`);
-      setSnackbarSeverity("error");
+      setSnackbarSeverity('error');
     } finally {
       setSnackbarOpen(true);
     }
   };
 
-  const handleWhatsApp = (user, plan, startDate) => {
-    const message = `Hi ${user.name}, your purchase of the ${plan.name} plan on ${startDate} was successful! Thank you for being a member of Her Chamber Fitness.`;
-    window.open(`https://wa.me/${user.mobile_number_1}?text=${encodeURIComponent(message)}`);
+  const handleEditRemark = (membershipId, currentRemark) => {
+    setEditingRemarkId(membershipId);
+    setRemarkInput(currentRemark || '');
   };
 
   const handlePrint = (membership) => {
@@ -148,89 +236,16 @@ function ExistingMemberships() {
     setOpenPrintDialog(true);
   };
 
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFont("times", "bold");
-    doc.setFontSize(24);
-    doc.text("Membership Report", 20, 30);
-    doc.setLineWidth(0.5);
-    doc.line(20, 33, 200, 33);
-
-    const startDate = dateRange === 'custom' && customFromDate ? formatIndianDate(customFromDate) : '';
-    const endDate = dateRange === 'custom' && customToDate ? formatIndianDate(customToDate) : '';
-    const dateRangeText = dateRange === 'custom' ? `${startDate} - ${endDate}` : 'Today';
-
-    doc.setFontSize(14);
-    doc.setFont("times", "normal");
-    doc.text(`Total Income for Selected Period: ${todayIncome.toFixed(2)}`, 20, 45);
-    doc.text(`Time Period: ${dateRangeText}`, 20, 55);
-
-    const tableData = memberships.map((membership, index) => ([
-        index + 1,
-        membership.id,
-        membership.users.name,
-        membership.membership_plan.name,
-        formatIndianDate(membership.start_date),
-        formatIndianDate(membership.end_date),
-        formatIndianDate(membership.users.date_of_birth),
-        formatIndianDateTime(membership.created_at),
-        `${membership.total_amount.toFixed(2)}`
-    ]));
-
-    const tableColumns = [
-        { header: "S.No", dataKey: "sno" },
-        { header: "Membership ID", dataKey: "id" },
-        { header: "User", dataKey: "user" },
-        { header: "Plan", dataKey: "plan" },
-        { header: "Start Date", dataKey: "startDate" },
-        { header: "End Date", dataKey: "endDate" },
-        { header: "DOB", dataKey: "dob" },
-        { header: "Created At", dataKey: "createdAt" },
-        { header: "Amount", dataKey: "amount" }
-    ];
-
-    doc.autoTable({
-        startY: 65,
-        head: [tableColumns.map(col => col.header)],
-        body: tableData,
-        styles: {
-            fontSize: 10,
-            cellPadding: 5,
-            halign: 'left',
-            valign: 'middle',
-            overflow: 'linebreak',
-            minCellHeight: 10,
-            textColor: [0, 0, 0],
-            lineColor: [200, 200, 200],
-            lineWidth: 0.1,
-        },
-        headStyles: {
-            fillColor: [245, 245, 245],
-            textColor: [100, 100, 100],
-            fontStyle: 'bold',
-            halign: 'left',
-            fontSize: 12,
-        },
-        alternateRowStyles: {
-            fillColor: [255, 255, 255]
-        },
-        columnStyles: {
-            0: { halign: 'center' },
-            8: { halign: 'right' }
-        },
-        theme: 'grid',
-        didDrawPage: function (data) {
-            const pageCount = doc.internal.getNumberOfPages();
-            doc.setFontSize(10);
-            doc.text(`Page ${data.pageNumber} of ${pageCount}`, 105, 290, { align: 'center' });
-        }
-    });
-
-    const formattedDate = formatIndianDate(new Date().toISOString());
-    doc.save(`Membership_Report_${formattedDate}.pdf`);
+  const handleWhatsApp = (user, plan, startDate) => {
+    const message = `Hello ${user.name}, your membership for the ${plan.name} plan starts on ${formatIndianDate(
+      startDate
+    )}. Thank you!`;
+    const phoneNumber = user.mobile_number_1;
+    const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappURL, '_blank');
   };
 
-  const totalPages = Math.ceil(memberships.length / membershipsPerPage);
+  const totalPages = Math.ceil(memberships.length / entriesPerPage);
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
@@ -246,99 +261,190 @@ function ExistingMemberships() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-2xl">Existing Memberships</CardTitle>
-          <Button onClick={() => setOpenMembershipDialog(true)}>Add Membership</Button>
+          <div className="flex space-x-2">
+            <Button onClick={() => setOpenMembershipDialog(true)}>Add Membership</Button>
+            <DownloadMemberships
+              dateRange={dateRange}
+              customFromDate={customFromDate}
+              customToDate={customToDate}
+              memberships={memberships}
+              todayIncome={todayIncome}
+            />
+          </div>
         </div>
-        <div className="mt-4 flex justify-between items-center">
+        <div className="mt-4 flex items-center space-x-4">
           <div>
             <Label>Total Income:</Label>
             <p className="font-bold text-lg">₹ {todayIncome.toFixed(2)}</p>
           </div>
-          <div className="flex space-x-4">
-            <Select onValueChange={setDateRange} defaultValue={dateRange}>
-              <SelectTrigger>Date Range</SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-            {dateRange === 'custom' && (
-              <>
-                <Input type="date" value={customFromDate} onChange={(e) => setCustomFromDate(e.target.value)} />
-                <Input type="date" value={customToDate} onChange={(e) => setCustomToDate(e.target.value)} />
-              </>
-            )}
-            <Button onClick={handleDownloadPDF}>
-              <FileText className="mr-2" /> Download Report
-            </Button>
-          </div>
+          <Select onValueChange={setDateRange} value={dateRange}>
+            <SelectTrigger className="w-[150px]">
+              <span>{dateFilterOptions.find((option) => option.value === dateRange)?.label || 'Date Range'}</span>
+            </SelectTrigger>
+            <SelectContent>
+              {dateFilterOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {dateRange === 'custom' && (
+            <>
+              <Input
+                type="date"
+                value={customFromDate}
+                onChange={(e) => setCustomFromDate(e.target.value)}
+                className="w-[150px]"
+              />
+              <Input
+                type="date"
+                value={customToDate}
+                onChange={(e) => setCustomToDate(e.target.value)}
+                className="w-[150px]"
+              />
+            </>
+          )}
         </div>
       </CardHeader>
 
       <CardContent>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center space-x-4">
           <Input
             type="text"
-            placeholder="Search by Membership ID"
-            value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
+            placeholder="Search by Name or Membership ID"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-grow"
           />
+          <Select
+            onValueChange={(value) => {
+              setEntriesPerPage(parseInt(value, 10));
+              setCurrentPage(1); // Reset to first page when entries per page changes
+            }}
+            value={entriesPerPage.toString()}
+          >
+            <SelectTrigger className="w-[150px]">Entries: {entriesPerPage}</SelectTrigger>
+            <SelectContent>
+              {entriesOptions.map((option) => (
+                <SelectItem key={option} value={option.toString()}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="max-h-96 overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0">
+
+        <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+          <table className="w-full border-collapse">
+            <thead className="bg-gray-100 sticky top-0">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Membership ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Mode</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount (₹)</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                {[
+                  'S.No',
+                  'Membership ID',
+                  'User Name',
+                  'DOB',
+                  'Plan',
+                  'Payment Mode',
+                  'Start Date',
+                  'End Date',
+                  'Total Amount (₹)',
+                  'Remarks',
+                  'Actions',
+                ].map((header) => (
+                  <th
+                    key={header}
+                    className="px-4 py-2 text-left text-sm font-medium text-gray-600 sticky top-0 bg-gray-100"
+                  >
+                    {header}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {memberships.slice((currentPage - 1) * membershipsPerPage, currentPage * membershipsPerPage).map((membership) => (
-                <tr key={membership.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.users.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.users.date_of_birth)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.membership_plan.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{membership.payment_modes.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.start_date)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{formatIndianDate(membership.end_date)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">₹ {membership.total_amount.toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end space-x-2">
-                    <Printer
-                      className="cursor-pointer text-gray-600 hover:text-gray-800 w-4 h-4"
-                      onClick={() => handlePrint(membership)}
-                    />
-                    <MessageCircle
-                      className="text-green-500 cursor-pointer hover:text-green-700 w-4 h-4"
-                      onClick={() => handleWhatsApp(membership.users, membership.membership_plan, membership.start_date)}
-                    />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDeleteMembership(membership.id)}>
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-              {memberships.length === 0 && (
+            <tbody>
+              {memberships.length > 0 ? (
+                memberships
+                  .slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage)
+                  .map((membership, index) => (
+                    <tr key={membership.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="px-4 py-2">{(currentPage - 1) * entriesPerPage + index + 1}</td>
+                      <td className="px-4 py-2">{membership.id}</td>
+                      <td className="px-4 py-2">{membership.users ? membership.users.name : 'No User'}</td>
+                      <td className="px-4 py-2">
+                        {membership.users ? formatIndianDate(membership.users.date_of_birth) : 'N/A'}
+                      </td>
+                      <td className="px-4 py-2">
+                        {membership.membership_plan ? membership.membership_plan.name : 'N/A'}
+                      </td>
+                      <td className="px-4 py-2">
+                        {membership.payment_modes ? membership.payment_modes.name : 'N/A'}
+                      </td>
+                      <td className="px-4 py-2">{formatIndianDate(membership.start_date)}</td>
+                      <td className="px-4 py-2">{formatIndianDate(membership.end_date)}</td>
+                      <td className="px-4 py-2"> {membership.total_amount.toFixed(2)}</td>
+                      <td className="px-4 py-2">
+                        {editingRemarkId === membership.id ? (
+                          <div className="flex items-center">
+                            <Input
+                              type="text"
+                              value={remarkInput}
+                              onChange={(e) => setRemarkInput(e.target.value)}
+                            />
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="ml-2"
+                              onClick={() => handleUpdateRemark(membership.id)}
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <span>{membership.remarks || 'No remarks'}</span>
+                            <Edit3
+                              className="ml-2 cursor-pointer text-gray-600 hover:text-gray-800 w-4 h-4"
+                              onClick={() => handleEditRemark(membership.id, membership.remarks)}
+                            />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center space-x-2">
+                          <Printer
+                            className="cursor-pointer text-gray-600 hover:text-gray-800 w-4 h-4"
+                            onClick={() => handlePrint(membership)}
+                          />
+                          <MessageCircle
+                            className="text-green-500 cursor-pointer hover:text-green-700 w-4 h-4"
+                            onClick={() =>
+                              handleWhatsApp(
+                                membership.users,
+                                membership.membership_plan,
+                                membership.start_date
+                              )
+                            }
+                          />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDeleteMembership(membership.id)}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              ) : (
                 <tr>
-                  <td colSpan="9" className="px-6 py-4 text-center">
+                  <td colSpan="11" className="px-4 py-2 text-center">
                     No memberships found.
                   </td>
                 </tr>
@@ -346,14 +452,21 @@ function ExistingMemberships() {
             </tbody>
           </table>
         </div>
-        <div className="mt-4 flex justify-between">
-          <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
+
+        <div className="mt-4 flex justify-between items-center">
+          <Button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
             Previous
           </Button>
           <span>
             Page {currentPage} of {totalPages}
           </span>
-          <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>
+          <Button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
             Next
           </Button>
         </div>
@@ -370,7 +483,11 @@ function ExistingMemberships() {
         </Alert>
       </Snackbar>
 
-      <MembershipDialog open={openMembershipDialog} onClose={() => setOpenMembershipDialog(false)} refreshData={fetchMemberships} />
+      <MembershipDialog
+        open={openMembershipDialog}
+        onClose={() => setOpenMembershipDialog(false)}
+        refreshData={fetchMemberships}
+      />
 
       {selectedMembership && (
         <PrintBillDialog

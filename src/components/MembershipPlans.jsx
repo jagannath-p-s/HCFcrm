@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Trash2 } from 'lucide-react'; // Importing icons from Lucide
-import { supabase } from '../supabaseClient'; // Adjust the path if necessary
-import { Button } from '@/components/ui/button'; // ShadCN Button
-import { Input } from '@/components/ui/input'; // ShadCN Input
+import { Edit, Trash2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'; // ShadCN Dialog
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -18,14 +18,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'; // ShadCN Table
+} from '@/components/ui/table';
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'; // ShadCN Card
+} from '@/components/ui/card';
 
 function MembershipPlans({ showSnackbar }) {
   const [membershipPlans, setMembershipPlans] = useState([]);
@@ -38,13 +38,12 @@ function MembershipPlans({ showSnackbar }) {
     type: '',
     class_type: '',
     additional_services: '',
-    number_of_people: 1, // Default to 1 person
+    number_of_people: 1,
   });
-  const [expanded, setExpanded] = useState(false); // State for expand/contract
+  const [expanded, setExpanded] = useState(false); // Toggle for expanded state
   const [currentPage, setCurrentPage] = useState(1); // Pagination state
   const plansPerPage = 15;
 
-  // Fetch membership plans on component mount
   useEffect(() => {
     fetchMembershipPlans();
   }, []);
@@ -59,7 +58,6 @@ function MembershipPlans({ showSnackbar }) {
     }
   };
 
-  // Dialog handlers
   const handleOpenPlanDialog = (plan = null) => {
     setPlanFormData(
       plan || {
@@ -70,7 +68,7 @@ function MembershipPlans({ showSnackbar }) {
         type: '',
         class_type: '',
         additional_services: '',
-        number_of_people: 1, // Reset to default value of 1 person
+        number_of_people: 1,
       }
     );
     setOpenPlanDialog(true);
@@ -88,7 +86,6 @@ function MembershipPlans({ showSnackbar }) {
   const handlePlanFormSubmit = async () => {
     try {
       if (planFormData.id) {
-        // Update existing plan
         const { error } = await supabase
           .from('membership_plans')
           .update({
@@ -104,7 +101,6 @@ function MembershipPlans({ showSnackbar }) {
         if (error) throw error;
         showSnackbar('Plan updated successfully', 'success');
       } else {
-        // Create new plan
         const { error } = await supabase.from('membership_plans').insert({
           name: planFormData.name,
           duration_in_days: planFormData.duration_in_days,
@@ -140,15 +136,13 @@ function MembershipPlans({ showSnackbar }) {
     }
   };
 
-  // Pagination logic
   const totalPages = Math.ceil(membershipPlans.length / plansPerPage);
   const indexOfLastPlan = currentPage * plansPerPage;
   const indexOfFirstPlan = indexOfLastPlan - plansPerPage;
 
-  // Handle expanded state
   const currentPlans = expanded
-    ? membershipPlans.slice(0, 1) // Show only 1 plan in contracted mode
-    : membershipPlans.slice(indexOfFirstPlan, indexOfLastPlan); // Paginated plans when expanded
+    ? membershipPlans.slice(indexOfFirstPlan, indexOfLastPlan)
+    : membershipPlans.slice(0, 1);
 
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
@@ -156,9 +150,8 @@ function MembershipPlans({ showSnackbar }) {
     }
   };
 
-  // Pagination Component
   const renderPagination = () => {
-    if (totalPages <= 1 || expanded) return null;
+    if (totalPages <= 1 || !expanded) return null;
 
     const pagesToShow = [];
     const maxPagesToShow = 5;
@@ -267,7 +260,7 @@ function MembershipPlans({ showSnackbar }) {
             )}
           </TableBody>
         </Table>
-        {!expanded && renderPagination()}
+        {expanded && renderPagination()}
       </CardContent>
 
       <CardFooter>
