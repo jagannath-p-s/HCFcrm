@@ -80,27 +80,26 @@ function ExistingMemberships() {
       let startOfYear = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
 
       let query = supabase
-        .from('memberships')
-        .select(
-          `
-          id,
-          user_id,
-          start_date,
-          end_date,
-          total_amount,
-          remarks,
-          created_at,
-          users (
-            id,
-            name,
-            mobile_number_1,
-            date_of_birth,
-            active
-          ),
-          membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
-          payment_modes (id, name)
-        `
-        );
+  .from('memberships')
+  .select(`
+    id,
+    user_id,
+    start_date,
+    end_date,
+    total_amount,
+    remarks,
+    created_at,
+    users (
+      id,
+      name,
+      mobile_number_1,
+      date_of_birth,
+      active
+    ),
+    membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
+    payment_mode:payment_modes!memberships_payment_mode_id_fkey (id, name) -- Ensure this line includes payment_mode
+  `);
+
 
       // Remove users.active filter or make it optional
       // query = query.eq('users.active', true);
@@ -232,9 +231,11 @@ function ExistingMemberships() {
   };
 
   const handlePrint = (membership) => {
-    setSelectedMembership(membership);
+    console.log("Selected Membership:", membership);
+    setSelectedMembership(membership); // Pass the entire membership object
     setOpenPrintDialog(true);
   };
+  
 
   const handleWhatsApp = (user, plan, startDate) => {
     const message = `Hello ${user.name}, your membership for the ${plan.name} plan starts on ${formatIndianDate(
@@ -489,7 +490,7 @@ function ExistingMemberships() {
         refreshData={fetchMemberships}
       />
 
-      {selectedMembership && (
+{selectedMembership && (
         <PrintBillDialog
           open={openPrintDialog}
           onClose={() => setOpenPrintDialog(false)}
