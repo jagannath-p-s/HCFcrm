@@ -47,8 +47,8 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
       <div className="flex justify-between mb-6">
   <img src={logo} alt="Logo" className="h-40" />
   <div>
-    <h2 className="text-lg font-bold text-right">INVOICE</h2>
-    <p className="text-right">INVOICE NO: {membership.id}</p>
+    <h2 className="text-lg font-bold text-right">BILL</h2>
+    <p className="text-right">BILL NO: {membership.id}</p>
     <p className="text-right">DATE: {new Date().toLocaleDateString()}</p>
   </div>
 </div>
