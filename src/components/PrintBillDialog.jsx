@@ -77,7 +77,7 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
             <tr className="bg-gray-200">
               <th className="text-left pb-2 pt-2 pl-2 border-b border-gray-400">Item</th>
               <th className="text-left pb-2 pt-2 pl-2 border-b border-gray-400">From - To</th>
-              <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Reg. Fee</th>
+              <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Adm. Fee</th>
               <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Plan Fee</th>
               <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Additional Fee</th>
               <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Total</th>
@@ -130,4 +130,3 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
 };
 
 export default PrintBillDialog;
-
