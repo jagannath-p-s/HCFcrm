@@ -387,8 +387,9 @@ function ExistingMemberships() {
                         {membership.membership_plan ? membership.membership_plan.name : 'N/A'}
                       </td>
                       <td className="px-4 py-2">
-                        {membership.payment_modes ? membership.payment_modes.name : 'N/A'}
-                      </td>
+  {membership.payment_mode ? membership.payment_mode.name : 'N/A'}
+</td>
+
                       <td className="px-4 py-2">{formatIndianDate(membership.start_date)}</td>
                       <td className="px-4 py-2">{formatIndianDate(membership.end_date)}</td>
                       <td className="px-4 py-2"> {membership.total_amount.toFixed(2)}</td>
