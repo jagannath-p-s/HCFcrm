@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Dialog } from '@mui/material';
 import { Button } from '../components/ui/button';
-import logo from '../assets/log.png';
+import logo from '../assets/log.png'; // Assuming your logo is here
 
 const PrintBillDialog = ({ open, onClose, membership }) => {
   const componentRef = useRef();
@@ -16,6 +16,7 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
       }
       body {
         font-family: 'Arial', sans-serif;
+        font-size: 14px;
       }
     `,
     onBeforeGetContent: () => {
@@ -44,50 +45,82 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <div ref={componentRef} className="p-8 bg-white text-sm">
-      <div className="flex justify-between mb-6">
-  <img src={logo} alt="Logo" className="h-40" />
-  <div>
-    <h2 className="text-lg font-bold text-right">BILL</h2>
-    <p className="text-right">BILL NO: {membership.id}</p>
-    <p className="text-right">DATE: {new Date().toLocaleDateString()}</p>
-  </div>
-</div>
-
-
-        <div className="mb-4">
-          <h3 className="font-semibold mb-2">To: {membership.users?.name}</h3>
-          <p>Membership Period: {formatDate(membership.start_date)} - {formatDate(membership.end_date)}</p>
-          <p>Payment Mode: {membership.payment_mode?.name || 'N/A'}</p>
+        {/* Gym details */}
+        <div className="flex justify-between mb-6">
+          <div>
+            <h3 className="font-semibold mb-2">Her Chamber Fitness</h3>
+            <p>Peramangalam, Thrissur</p>
+            <p>Contact: +91 8848581074</p>
+            <p>Email: herchambergym@gmail.com</p>
+          </div>
+          <img src={logo} alt="Logo" style={{  height: '140px' }} />
         </div>
 
-        <table className="w-full mb-4">
+        {/* Invoice details */}
+        <div className="text-right mb-6">
+          <h2 className="text-lg font-bold">INVOICE</h2>
+          <p>Invoice #: {membership.id}</p>
+          <p>Invoice Date: {formatDate(membership.created_at)}</p>
+          <p>Pay Mode: {membership.payment_mode?.name || 'N/A'}</p>
+        </div>
+
+        {/* Member details */}
+        <div className="mb-4">
+          <h3 className="font-semibold">Member ID: {membership.id}</h3>
+          <p>Member Name: {membership.users?.name}</p>
+          <p>Member Ph: {membership.users?.mobile_number_1}</p>
+        </div>
+
+        {/* Table for membership details */}
+        <table className="w-full mb-4 border-collapse border border-gray-400">
           <thead>
-            <tr>
-              <th className="text-left pb-2 border-b">PLAN</th>
-              <th className="text-left pb-2 border-b">QTY</th>
-              <th className="text-right pb-2 border-b">TOTAL</th>
+            <tr className="bg-gray-200">
+              <th className="text-left pb-2 pt-2 pl-2 border-b border-gray-400">Item</th>
+              <th className="text-left pb-2 pt-2 pl-2 border-b border-gray-400">From - To</th>
+              <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Reg. Fee</th>
+              <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Plan Fee</th>
+              <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Additional Fee</th>
+              <th className="text-right pb-2 pt-2 pr-2 border-b border-gray-400">Total</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="pt-4">{membership.membership_plan?.name}</td>
-              <td className="pt-4">1</td>
-              <td className="pt-4 text-right">₹ {membership.total_amount}</td>
+              {/* Dynamic plan name from membership object */}
+              <td className="pt-4 pl-2">{membership.membership_plan?.name || 'N/A'}</td>
+              <td className="pt-4 pl-2">
+                {formatDate(membership.start_date)} - {formatDate(membership.end_date)}
+              </td>
+              <td className="pt-4 pr-2 text-right">
+                {membership.admission_or_renewal_fee ? membership.admission_or_renewal_fee.toFixed(2) : '0.00'}
+              </td>
+              <td className="pt-4 pr-2 text-right">
+                {membership.plan_fee ? membership.plan_fee.toFixed(2) : '0.00'}
+              </td>
+              <td className="pt-4 pr-2 text-right">
+                {membership.additional_fee ? membership.additional_fee.toFixed(2) : '0.00'}
+              </td>
+              <td className="pt-4 pr-2 text-right">
+                {membership.total_amount ? membership.total_amount.toFixed(2) : '0.00'}
+              </td>
             </tr>
           </tbody>
         </table>
 
+        {/* Payment and total summary */}
         <div className="text-right font-semibold">
-          <p>TOTAL: ₹ {membership.total_amount}</p>
+          <p>Rec. Amount: ₹ {membership.total_amount ? membership.total_amount.toFixed(2) : '0.00'}</p>
+          <p>Balance Due: ₹ 0.00</p>
         </div>
 
-        <div className="mt-6">
+        {/* Footer */}
+        <div className="mt-6 text-center">
           <p className="text-xs italic">
-            Thank you for being a member of Her Chamber Fitness!
+            Fees once paid will not be refundable
           </p>
         </div>
       </div>
 
+      {/* Buttons for closing and printing */}
       <div className="p-4 flex justify-end space-x-4">
         <Button onClick={onClose} variant="outlined">Close</Button>
         <Button onClick={handlePrint} variant="contained" color="primary">Print Bill</Button>
@@ -97,3 +130,4 @@ const PrintBillDialog = ({ open, onClose, membership }) => {
 };
 
 export default PrintBillDialog;
+
