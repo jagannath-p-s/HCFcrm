@@ -78,33 +78,41 @@ function ExistingMemberships() {
     try {
       const today = new Date();
       let startOfYear = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
-
+  
+      // Build the query to select all required fields from memberships
       let query = supabase
-  .from('memberships')
-  .select(`
-    id,
-    user_id,
-    start_date,
-    end_date,
-    total_amount,
-    remarks,
-    created_at,
-    users (
-      id,
-      name,
-      mobile_number_1,
-      date_of_birth,
-      active
-    ),
-    membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
-    payment_mode:payment_modes!memberships_payment_mode_id_fkey (id, name) -- Ensure this line includes payment_mode
-  `);
-
-
-      // Remove users.active filter or make it optional
-      // query = query.eq('users.active', true);
-
-      // Date filters
+        .from('memberships')
+        .select(`
+          id,
+          user_id,
+          admission_plan_id,
+          membership_plan_id,
+          additional_service_plan_id,
+          payment_mode_id,
+          start_date,
+          end_date,
+          admission_or_renewal_fee,
+          plan_fee,
+          additional_fee,
+          total_amount,
+          remarks,
+          created_at,
+          payment_date,
+          number_of_people,
+          users (
+            id,
+            name,
+            mobile_number_1,
+            date_of_birth,
+            active
+          ),
+          admission_plan:membership_plans!memberships_admission_plan_id_fkey (id, name),
+          membership_plan:membership_plans!memberships_membership_plan_id_fkey (id, name),
+          additional_service_plan:membership_plans!memberships_additional_service_plan_id_fkey (id, name),
+          payment_mode:payment_modes!memberships_payment_mode_id_fkey (id, name)
+        `);
+  
+      // Apply date filters
       if (dateRange !== 'all') {
         if (dateRange === 'today') {
           query = query.eq('start_date', today.toISOString().split('T')[0]);
@@ -128,25 +136,26 @@ function ExistingMemberships() {
           query = query.gte('start_date', customFromDate).lte('start_date', customToDate);
         }
       }
-
-      // Check if searchTerm is a numeric value
+  
+      // Search by either ID or user's name
       if (searchTerm) {
         if (/^\d+$/.test(searchTerm)) {
-          // If searchTerm is numeric
           query = query.eq('id', parseInt(searchTerm, 10));
         } else {
-          // If searchTerm is not numeric
           query = query.ilike('users.name', `%${searchTerm}%`);
         }
       }
-
+  
+      // Execute the query
       const { data: membershipsData, error } = await query;
       if (error) throw error;
+  
       setMemberships(membershipsData);
     } catch (error) {
       console.error('Error fetching memberships:', error.message);
     }
   };
+  
 
   const calculateTodayIncome = async () => {
     try {
