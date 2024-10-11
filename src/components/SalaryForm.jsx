@@ -1,10 +1,12 @@
+// components/SalaryForm.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Snackbar, Alert } from '@mui/material';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient'; // Ensure correct path
 
 const SalaryForm = ({ staffs, onSalaryAdded }) => {
   const [formData, setFormData] = useState({
@@ -23,7 +25,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
     if (!staffs || staffs.length === 0) {
       fetchStaffs();
     }
-  }, []);
+  }, [staffs]);
 
   const fetchStaffs = async () => {
     try {
@@ -36,7 +38,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
     }
   };
 
-  const handleStaffSelect = async (staffId) => {
+  const handleStaffSelect = (staffId) => {
     const selectedStaff = availableStaffs.find((staff) => staff.id.toString() === staffId);
     if (selectedStaff) {
       setFormData((prevData) => ({
@@ -59,24 +61,42 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
       const bonuses = parseFloat(formData.bonuses || 0);
       const netSalary = baseSalary + bonuses - deductions;
 
-      const { error } = await supabase.from('staff_salaries').insert([
-        {
-          staff_id: formData.staff_id,
-          base_salary: baseSalary,
-          advance_taken: deductions,
-          manual_deduction: deductions,
-          total_deductions: deductions,
-          net_salary: netSalary,
-          payment_date: formData.scheduled_payment_date,
-          remarks: formData.remarks,
-        },
-      ]);
+      const { data, error } = await supabase
+        .from('staff_salaries')
+        .insert([
+          {
+            staff_id: formData.staff_id,
+            base_salary: baseSalary,
+            advance_taken: deductions,
+            manual_deduction: deductions,
+            total_deductions: deductions,
+            net_salary: netSalary,
+            payment_date: formData.scheduled_payment_date,
+            bonuses: bonuses,
+            remarks: formData.remarks,
+          },
+        ])
+        .select(); // Use select() to return the inserted row
 
       if (error) throw error;
 
       setIsDialogOpen(false);
       showSnackbar('Salary scheduled successfully', 'success');
-      onSalaryAdded();
+
+      // Pass the new salary to the parent component
+      if (onSalaryAdded && data) {
+        onSalaryAdded(data[0]);
+      }
+
+      // Reset the form
+      setFormData({
+        staff_id: '',
+        scheduled_payment_date: '',
+        deductions: 0,
+        bonuses: 0,
+        salary_amount: 0,
+        remarks: '',
+      });
     } catch (error) {
       console.error('Error inserting salary:', error.message);
       showSnackbar('Error scheduling salary', 'error');
@@ -96,7 +116,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
       <Button onClick={() => setIsDialogOpen(true)}>
         Schedule Salary Payment
       </Button>
-      
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -128,17 +148,32 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
 
             <div>
               <label className="text-sm font-medium">Scheduled Payment Date</label>
-              <Input type="date" name="scheduled_payment_date" value={formData.scheduled_payment_date} onChange={handleChange} />
+              <Input
+                type="date"
+                name="scheduled_payment_date"
+                value={formData.scheduled_payment_date}
+                onChange={handleChange}
+              />
             </div>
 
             <div>
               <label className="text-sm font-medium">Deductions</label>
-              <Input type="number" name="deductions" value={formData.deductions} onChange={handleChange} />
+              <Input
+                type="number"
+                name="deductions"
+                value={formData.deductions}
+                onChange={handleChange}
+              />
             </div>
 
             <div>
               <label className="text-sm font-medium">Bonuses</label>
-              <Input type="number" name="bonuses" value={formData.bonuses} onChange={handleChange} />
+              <Input
+                type="number"
+                name="bonuses"
+                value={formData.bonuses}
+                onChange={handleChange}
+              />
             </div>
 
             <div className="md:col-span-2">
@@ -148,10 +183,16 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
 
             <div className="md:col-span-2">
               <label className="text-sm font-medium">Remarks</label>
-              <Input name="remarks" value={formData.remarks} onChange={handleChange} />
+              <Input
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleChange}
+              />
             </div>
           </div>
-          <Button onClick={handleAddSalary} className="mt-4">Schedule Salary</Button>
+          <Button onClick={handleAddSalary} className="mt-4">
+            Schedule Salary
+          </Button>
         </DialogContent>
       </Dialog>
 

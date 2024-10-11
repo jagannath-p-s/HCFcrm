@@ -1,9 +1,11 @@
+// components/Salary.jsx
+
 import React, { useState, useEffect } from 'react';
 import SalaryForm from './SalaryForm';
-import SalaryList from './SalaryList';
-import AdvancesComponent from './AdvancesComponent';
+import SalaryTable from './SalaryTable';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import { supabase } from '../supabaseClient'; // Ensure correct path
 
 const Salary = ({ initialSalaries, initialStaffs, initialAdvances }) => {
   const [salaries, setSalaries] = useState(initialSalaries || []);
@@ -12,8 +14,31 @@ const Salary = ({ initialSalaries, initialStaffs, initialAdvances }) => {
   const [currentMonth] = useState(format(new Date(), 'yyyy-MM'));
 
   useEffect(() => {
-    // In a real-world scenario, you could use this space for any side effects needed after data is passed in as props
-  }, []);
+    // Fetch initial data if not provided via props
+    const fetchInitialData = async () => {
+      try {
+        const { data: staffData, error: staffError } = await supabase
+          .from('staffs')
+          .select('*');
+        if (staffError) throw staffError;
+        setStaffs(staffData);
+
+        const { data: salaryData, error: salaryError } = await supabase
+          .from('staff_salaries')
+          .select('*');
+        if (salaryError) throw salaryError;
+        setSalaries(salaryData);
+      } catch (error) {
+        console.error('Error fetching initial data:', error.message);
+      }
+    };
+
+    if (!initialStaffs || !initialSalaries) {
+      fetchInitialData();
+    }
+
+    // Note: Real-time subscription is handled within SalaryTable
+  }, [initialSalaries, initialStaffs]);
 
   const handleSalaryAdded = (newSalary) => {
     setSalaries([...salaries, newSalary]);
@@ -24,13 +49,15 @@ const Salary = ({ initialSalaries, initialStaffs, initialAdvances }) => {
   };
 
   const handleMarkAsPaid = (salaryId) => {
-    setSalaries(salaries.map(salary => 
-      salary.id === salaryId ? { ...salary, status: 'Paid' } : salary
-    ));
+    setSalaries(
+      salaries.map((salary) =>
+        salary.id === salaryId ? { ...salary, status: 'Paid' } : salary
+      )
+    );
   };
 
   const handleDeleteSalary = (salaryId) => {
-    setSalaries(salaries.filter(salary => salary.id !== salaryId));
+    setSalaries(salaries.filter((salary) => salary.id !== salaryId));
   };
 
   return (
@@ -45,24 +72,16 @@ const Salary = ({ initialSalaries, initialStaffs, initialAdvances }) => {
             selectedMonth={currentMonth}
             onSalaryAdded={handleSalaryAdded}
           />
-          <SalaryList
-            salaries={salaries}
-            onMarkAsPaid={handleMarkAsPaid}
-            onDeleteSalary={handleDeleteSalary}
-          />
         </CardContent>
       </Card>
 
+      {/* Render the SalaryTable component inside a Card for consistent UI */}
       <Card>
         <CardHeader>
-          <CardTitle>Advances Given</CardTitle>
+          <CardTitle>Scheduled Salaries</CardTitle>
         </CardHeader>
         <CardContent>
-          <AdvancesComponent
-            staffs={staffs}
-            advances={advances}
-            onAdvanceAdded={handleAdvanceAdded}
-          />
+          <SalaryTable />
         </CardContent>
       </Card>
     </div>
