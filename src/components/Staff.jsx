@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,13 +18,18 @@ import { Badge } from "@/components/ui/badge";
 import { Users, UserCheck, Clock, XCircle, MoreVertical } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,8 +48,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, min, endOfDay } from "date-fns";
-import bcrypt from "bcryptjs"; // Import bcrypt for password hashing
+import {
+  format,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  min,
+  endOfDay,
+} from "date-fns";
+import StaffDialog from "./StaffDialog";
 
 const Staff = () => {
   const [attendanceData, setAttendanceData] = useState([]);
@@ -54,28 +67,20 @@ const Staff = () => {
   const [absent, setAbsent] = useState(0);
   const [late, setLate] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [newStaff, setNewStaff] = useState({
-    user_id: "", // Added user_id
-    username: "",
-    useremail: "",
-    password: "",
-    role: "Staff",
-    mobile_number: "",
-    employee_code: "",
-    salary: "",
-  });
-  
-  const [selectedStaff, setSelectedStaff] = useState({});
+
+  const [selectedStaff, setSelectedStaff] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return format(now, "MMMM yyyy");
   });
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
   const [isViewAttendanceOpen, setIsViewAttendanceOpen] = useState(false);
   const [staffAttendance, setStaffAttendance] = useState([]);
-  const [attendanceMonth, setAttendanceMonth] = useState(format(new Date(), "MMMM yyyy"));
+  const [attendanceMonth, setAttendanceMonth] = useState(
+    format(new Date(), "MMMM yyyy")
+  );
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -126,7 +131,11 @@ const Staff = () => {
       for (const day of daysInMonth) {
         for (const staff of staffsData) {
           const staffLogs = accessLogs
-            .filter((log) => log.user_id === staff.user_id && isSameDay(parseISO(log.timestamp), day))
+            .filter(
+              (log) =>
+                log.user_id === staff.user_id &&
+                isSameDay(parseISO(log.timestamp), day)
+            )
             .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
           if (staffLogs.length > 0) {
@@ -155,21 +164,33 @@ const Staff = () => {
               checkOutTime = endOfDay(checkInTime);
             }
 
-            const checkInTimeStr = checkInTime ? format(checkInTime, "HH:mm") : "-";
-            const checkOutTimeStr = checkOutTime ? format(checkOutTime, "HH:mm") : "-";
+            const checkInTimeStr = checkInTime
+              ? format(checkInTime, "HH:mm")
+              : "-";
+            const checkOutTimeStr = checkOutTime
+              ? format(checkOutTime, "HH:mm")
+              : "-";
 
-            const checkInTotalMinutes = checkInTime.getHours() * 60 + checkInTime.getMinutes();
+            const checkInTotalMinutes =
+              checkInTime.getHours() * 60 + checkInTime.getMinutes();
             const lateThreshold = "09:15";
-            const [lateThresholdHours, lateThresholdMinutes] = lateThreshold.split(":").map(Number);
-            const lateThresholdTotalMinutes = lateThresholdHours * 60 + lateThresholdMinutes;
-            const status = checkInTotalMinutes <= lateThresholdTotalMinutes ? "Present" : "Late";
+            const [lateThresholdHours, lateThresholdMinutes] = lateThreshold
+              .split(":")
+              .map(Number);
+            const lateThresholdTotalMinutes =
+              lateThresholdHours * 60 + lateThresholdMinutes;
+            const status =
+              checkInTotalMinutes <= lateThresholdTotalMinutes
+                ? "Present"
+                : "Late";
 
             attendanceMap[staff.user_id].daysAbsent -= 1;
             attendanceMap[staff.user_id].daysPresent += 1;
             if (status === "Late") {
               attendanceMap[staff.user_id].daysLate += 1;
             }
-            attendanceMap[staff.user_id].totalCheckInMinutes += checkInTotalMinutes;
+            attendanceMap[staff.user_id].totalCheckInMinutes +=
+              checkInTotalMinutes;
             attendanceMap[staff.user_id].checkInCount += 1;
 
             if (isSameDay(day, today)) {
@@ -182,9 +203,15 @@ const Staff = () => {
       }
 
       const attendanceList = Object.values(attendanceMap);
-      const presentCount = attendanceList.filter((staff) => staff.status === "Present" || staff.status === "Late").length;
-      const lateCount = attendanceList.filter((staff) => staff.status === "Late").length;
-      const absentCount = attendanceList.filter((staff) => staff.status === "Absent").length;
+      const presentCount = attendanceList.filter(
+        (staff) => staff.status === "Present" || staff.status === "Late"
+      ).length;
+      const lateCount = attendanceList.filter(
+        (staff) => staff.status === "Late"
+      ).length;
+      const absentCount = attendanceList.filter(
+        (staff) => staff.status === "Absent"
+      ).length;
 
       setAttendanceData(attendanceList);
       setTotalStaff(staffsData.length);
@@ -198,7 +225,7 @@ const Staff = () => {
 
   // View Attendance
   useEffect(() => {
-    if (isViewAttendanceOpen) {
+    if (isViewAttendanceOpen && selectedStaff) {
       openViewAttendance(selectedStaff);
     }
   }, [attendanceMonth]);
@@ -242,139 +269,33 @@ const Staff = () => {
     }, {});
   };
 
-// Edit Staff - Fetch details by user_id instead of useremail
-const openEditDialog = async (staff) => {
-  try {
-    const { data, error } = await supabase
-      .from("staffs")
-      .select("*")
-      .eq("user_id", staff.id) // Fetch by user_id instead of useremail
-      .single(); // Ensure it fetches a single record
-
-    if (error) throw error;
-
-    setSelectedStaff({
-      user_id: data.user_id,               // Fetch user ID
-      username: data.username,             // Fetch username
-      useremail: data.useremail,           // Fetch user email
-      password: "",                        // Keep password blank for security
-      role: data.role,                     // Fetch role
-      mobile_number: data.mobile_number,   // Fetch mobile number
-      employee_code: data.employee_code,   // Fetch employee code
-      salary: data.salary,                 // Fetch salary
-    });
-
-    setIsEditDialogOpen(true);
-  } catch (error) {
-    console.error("Error fetching staff details:", error);
-  }
-};
-
-
-const handleEditStaff = async () => {
-  if (selectedStaff.username.trim()) {
+  // Edit Staff
+  const openEditDialog = async (staff) => {
     try {
-      let updates = {
-        username: selectedStaff.username.trim(),
-        useremail: selectedStaff.useremail.trim(),
-        role: selectedStaff.role,
-        mobile_number: selectedStaff.mobile_number,
-        employee_code: selectedStaff.employee_code,
-        salary: selectedStaff.salary ? parseFloat(selectedStaff.salary) : null,
-      };
-
-      // Only hash password if it's provided (optional during edit)
-      if (selectedStaff.password) {
-        const salt = bcrypt.genSaltSync(12);
-        const hashedPassword = bcrypt.hashSync(selectedStaff.password, salt);
-        updates.password = hashedPassword;
-      }
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("staffs")
-        .update(updates)
-        .eq("user_id", selectedStaff.user_id);  // Use user_id, not id
-
-      if (error) {
-        console.error("Error updating staff:", error);
-      } else {
-        setIsEditDialogOpen(false);
-        fetchAttendanceDataForMonth();  // Refresh attendance data
-      }
-    } catch (err) {
-      console.error("Error hashing password:", err.message);
-    }
-  }
-};
-
-
-const handleAddStaff = async () => {
-  if (
-    newStaff.user_id.trim() && // Check if user_id is provided
-    newStaff.username.trim() &&
-    newStaff.useremail.trim() &&
-    newStaff.password.trim()
-  ) {
-    try {
-      const salt = bcrypt.genSaltSync(12);
-      const hashedPassword = bcrypt.hashSync(newStaff.password, salt);
-
-      // Check if user_id already exists
-      const { data: existingStaff, error: existingError } = await supabase
-        .from("staffs")
-        .select("user_id")
-        .eq("user_id", newStaff.user_id)
+        .select("*")
+        .eq("user_id", staff.id)
         .single();
 
-      if (existingStaff) {
-        console.error("User ID already exists.");
-        return;
-      }
+      if (error) throw error;
 
-      const { data, error } = await supabase.from("staffs").insert([
-        {
-          user_id: newStaff.user_id.trim(), // Use the provided user_id
-          username: newStaff.username.trim(),
-          useremail: newStaff.useremail.trim(),
-          password: hashedPassword,
-          role: newStaff.role,
-          mobile_number: newStaff.mobile_number,
-          employee_code: newStaff.employee_code,
-          salary: newStaff.salary ? parseFloat(newStaff.salary) : null,
-          start_date: new Date().toISOString(),
-          end_date: new Date(
-            new Date().setFullYear(new Date().getFullYear() + 1)
-          ).toISOString(),
-          active: true,
-        },
-      ]);
+      setSelectedStaff({
+        user_id: data.user_id,
+        username: data.username,
+        useremail: data.useremail,
+        password: "",
+        role: data.role,
+        mobile_number: data.mobile_number,
+        employee_code: data.employee_code,
+        salary: data.salary,
+      });
 
-      if (error) {
-        console.error("Error adding new staff:", error);
-      } else {
-        // Reset the form
-        setNewStaff({
-          user_id: "",
-          username: "",
-          useremail: "",
-          password: "",
-          role: "Staff",
-          mobile_number: "",
-          employee_code: "",
-          salary: "",
-        });
-        setIsDialogOpen(false);
-        fetchAttendanceDataForMonth(); // Refresh attendance data
-      }
-    } catch (err) {
-      console.error("Error hashing password:", err.message);
+      setIsEditDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching staff details:", error);
     }
-  } else {
-    console.error("Please fill in all required fields.");
-  }
-};
-
-
+  };
 
   // Delete Staff
   const openDeleteDialog = (staff) => {
@@ -405,7 +326,11 @@ const handleAddStaff = async () => {
     const options = [];
     const currentDate = new Date();
     for (let i = 0; i < 12; i++) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const date = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() - i,
+        1
+      );
       options.push(format(date, "MMMM yyyy"));
     }
     return options;
@@ -458,7 +383,10 @@ const handleAddStaff = async () => {
           <div className="flex justify-between items-center mb-4">
             <CardTitle>Staff Attendance Details</CardTitle>
             <div className="flex items-center space-x-4">
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <Select
+                value={selectedMonth}
+                onValueChange={setSelectedMonth}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
@@ -470,43 +398,18 @@ const handleAddStaff = async () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Input placeholder="Search staff" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-[200px]" />
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="secondary">Add Staff</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add New Staff</DialogTitle>
-                  </DialogHeader>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <Input
-  placeholder="User ID"
-  value={newStaff.user_id}
-  onChange={(e) =>
-    setNewStaff({ ...newStaff, user_id: e.target.value })
-  }
-/>
-                    <Input placeholder="Staff Name" value={newStaff.username} onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })} />
-                    <Input placeholder="Email" value={newStaff.useremail} onChange={(e) => setNewStaff({ ...newStaff, useremail: e.target.value })} />
-                    <Input placeholder="Password" type="password" value={newStaff.password} onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
-                    <Input placeholder="Mobile Number" value={newStaff.mobile_number} onChange={(e) => setNewStaff({ ...newStaff, mobile_number: e.target.value })} />
-                    <Input placeholder="Employee Code" value={newStaff.employee_code} onChange={(e) => setNewStaff({ ...newStaff, employee_code: e.target.value })} />
-                    <Input placeholder="Salary" type="number" value={newStaff.salary} onChange={(e) => setNewStaff({ ...newStaff, salary: e.target.value })} />
-                    <Select value={newStaff.role} onValueChange={(value) => setNewStaff({ ...newStaff, role: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={handleAddStaff} className="mt-4">Add Staff</Button>
-                </DialogContent>
-              </Dialog>
+              <Input
+                placeholder="Search staff"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-[200px]"
+              />
+              <Button
+                variant="secondary"
+                onClick={() => setIsAddDialogOpen(true)}
+              >
+                Add Staff
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -541,13 +444,27 @@ const handleAddStaff = async () => {
                     <TableCell>{record.checkIn}</TableCell>
                     <TableCell>{record.checkOut}</TableCell>
                     <TableCell>
-                      <Badge variant={record.status === "Present" ? "default" : record.status === "Late" ? "warning" : "destructive"}>
+                      <Badge
+                        variant={
+                          record.status === "Present"
+                            ? "default"
+                            : record.status === "Late"
+                            ? "warning"
+                            : "destructive"
+                        }
+                      >
                         {record.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-center">{record.daysPresent}</TableCell>
-                    <TableCell className="text-center">{record.daysAbsent}</TableCell>
-                    <TableCell className="text-center">{record.daysLate}</TableCell>
+                    <TableCell className="text-center">
+                      {record.daysPresent}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {record.daysAbsent}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {record.daysLate}
+                    </TableCell>
                     {/* <TableCell className="text-center">{record.averageCheckIn}</TableCell> */}
                     <TableCell>
                       <DropdownMenu>
@@ -555,9 +472,21 @@ const handleAddStaff = async () => {
                           <MoreVertical className="h-5 w-5 cursor-pointer" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
-                          <DropdownMenuItem onClick={() => openViewAttendance(record)}>View</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEditDialog(record)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openDeleteDialog(record)}>Delete</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openViewAttendance(record)}
+                          >
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openEditDialog(record)}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openDeleteDialog(record)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -570,11 +499,19 @@ const handleAddStaff = async () => {
       </Card>
 
       {/* View Attendance Dialog */}
-      <Dialog open={isViewAttendanceOpen} onOpenChange={setIsViewAttendanceOpen}>
+      <Dialog
+        open={isViewAttendanceOpen}
+        onOpenChange={setIsViewAttendanceOpen}
+      >
         <DialogContent className="h-[500px] overflow-auto">
           <DialogHeader>
-            <DialogTitle>View Attendance: {selectedStaff.name}</DialogTitle>
-            <Select value={attendanceMonth} onValueChange={setAttendanceMonth}>
+            <DialogTitle>
+              View Attendance: {selectedStaff && selectedStaff.name}
+            </DialogTitle>
+            <Select
+              value={attendanceMonth}
+              onValueChange={setAttendanceMonth}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select month" />
               </SelectTrigger>
@@ -606,8 +543,12 @@ const handleAddStaff = async () => {
                 Object.keys(staffAttendance).map((date, index) => (
                   <TableRow key={index}>
                     <TableCell>{date}</TableCell>
-                    <TableCell>{staffAttendance[date].checkIn || "-"}</TableCell>
-                    <TableCell>{staffAttendance[date].checkOut || "-"}</TableCell>
+                    <TableCell>
+                      {staffAttendance[date].checkIn || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {staffAttendance[date].checkOut || "-"}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -616,79 +557,43 @@ const handleAddStaff = async () => {
         </DialogContent>
       </Dialog>
 
+      {/* Add Staff Dialog */}
+      <StaffDialog
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        isEdit={false}
+        onSuccess={fetchAttendanceDataForMonth}
+      />
+
       {/* Edit Staff Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-      <DialogContent>
-  <DialogHeader>
-    <DialogTitle>Edit Staff</DialogTitle>
-  </DialogHeader>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-    <Input 
-      placeholder="User ID" 
-      value={selectedStaff.user_id || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, user_id: e.target.value })} 
-    />
-    <Input 
-      placeholder="Staff Name" 
-      value={selectedStaff.username || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, username: e.target.value })} 
-    />
-    <Input 
-      placeholder="Email" 
-      value={selectedStaff.useremail || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, useremail: e.target.value })} 
-    />
-    <Input 
-      placeholder="Password" 
-      type="password" 
-      value={selectedStaff.password || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, password: e.target.value })} 
-    />
-    <Input 
-      placeholder="Mobile Number" 
-      value={selectedStaff.mobile_number || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, mobile_number: e.target.value })} 
-    />
-    <Input 
-      placeholder="Employee Code" 
-      value={selectedStaff.employee_code || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, employee_code: e.target.value })} 
-    />
-    <Input 
-      placeholder="Salary" 
-      type="number" 
-      value={selectedStaff.salary || ""} 
-      onChange={(e) => setSelectedStaff({ ...selectedStaff, salary: e.target.value })} 
-    />
-    <Select 
-      value={selectedStaff.role || "Staff"} 
-      onValueChange={(value) => setSelectedStaff({ ...selectedStaff, role: value })}>
-      <SelectTrigger>
-        <SelectValue placeholder="Select Role" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="Admin">Admin</SelectItem>
-        <SelectItem value="Staff">Staff</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-  <Button onClick={handleEditStaff} className="mt-4">Save Changes</Button>
-</DialogContent>
-
-
-
-      </Dialog>
+      <StaffDialog
+        open={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        isEdit={true}
+        staffData={selectedStaff}
+        onSuccess={fetchAttendanceDataForMonth}
+      />
 
       {/* Delete Staff Alert Dialog */}
-      <AlertDialog open={isAlertDialogOpen} onOpenChange={setIsAlertDialogOpen}>
+      <AlertDialog
+        open={isAlertDialogOpen}
+        onOpenChange={setIsAlertDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this staff member?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone and will permanently delete the staff member.</AlertDialogDescription>
+            <AlertDialogTitle>
+              Are you sure you want to delete this staff member?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone and will permanently delete the staff
+              member.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteStaff}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteStaff}>
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
