@@ -195,7 +195,7 @@ const Debts = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-0">
       <Card>
         <CardHeader>
           <CardTitle>Total Debts Overview</CardTitle>

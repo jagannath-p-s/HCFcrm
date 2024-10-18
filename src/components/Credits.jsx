@@ -193,7 +193,7 @@ const Credits = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-0">
       <Card>
         <CardHeader>
           <CardTitle>Total Credits Overview</CardTitle>
