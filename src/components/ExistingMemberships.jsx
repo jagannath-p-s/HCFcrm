@@ -48,7 +48,7 @@ function ExistingMemberships() {
   const [openPrintDialog, setOpenPrintDialog] = useState(false);
   const [selectedMembership, setSelectedMembership] = useState(null);
   const [todayIncome, setTodayIncome] = useState(0);
-  const [dateRange, setDateRange] = useState('all'); // Changed default to 'all'
+  const [dateRange, setDateRange] = useState('all');
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,7 +79,6 @@ function ExistingMemberships() {
       const today = new Date();
       let startOfYear = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
   
-      // Build the query to select all required fields from memberships
       let query = supabase
         .from('memberships')
         .select(`
@@ -137,11 +136,13 @@ function ExistingMemberships() {
         }
       }
   
-      // Search by either ID or user's name
+      // Separate search for Membership ID and User Name
       if (searchTerm) {
         if (/^\d+$/.test(searchTerm)) {
+          // If searchTerm is a number, search by Membership ID
           query = query.eq('id', parseInt(searchTerm, 10));
         } else {
+          // If searchTerm is a string, search by User Name
           query = query.ilike('users.name', `%${searchTerm}%`);
         }
       }
@@ -150,7 +151,10 @@ function ExistingMemberships() {
       const { data: membershipsData, error } = await query;
       if (error) throw error;
   
-      setMemberships(membershipsData);
+      // Filter out memberships with missing users
+      const filteredMemberships = membershipsData.filter((membership) => membership.users);
+  
+      setMemberships(filteredMemberships);
     } catch (error) {
       console.error('Error fetching memberships:', error.message);
     }
@@ -240,11 +244,9 @@ function ExistingMemberships() {
   };
 
   const handlePrint = (membership) => {
-    console.log("Selected Membership:", membership);
     setSelectedMembership(membership); // Pass the entire membership object
     setOpenPrintDialog(true);
   };
-  
 
   const handleWhatsApp = (user, plan, startDate) => {
     const message = `Hello ${user.name}, your membership for the ${plan.name} plan starts on ${formatIndianDate(
@@ -387,9 +389,8 @@ function ExistingMemberships() {
                         {membership.membership_plan ? membership.membership_plan.name : 'N/A'}
                       </td>
                       <td className="px-4 py-2">
-  {membership.payment_mode ? membership.payment_mode.name : 'N/A'}
-</td>
-
+                        {membership.payment_mode ? membership.payment_mode.name : 'N/A'}
+                      </td>
                       <td className="px-4 py-2">{formatIndianDate(membership.start_date)}</td>
                       <td className="px-4 py-2">{formatIndianDate(membership.end_date)}</td>
                       <td className="px-4 py-2"> {membership.total_amount.toFixed(2)}</td>
@@ -500,7 +501,7 @@ function ExistingMemberships() {
         refreshData={fetchMemberships}
       />
 
-{selectedMembership && (
+      {selectedMembership && (
         <PrintBillDialog
           open={openPrintDialog}
           onClose={() => setOpenPrintDialog(false)}
