@@ -235,7 +235,15 @@ const Expenses = () => {
                 <SelectItem value="transport">Transport</SelectItem>
                 <SelectItem value="utilities">Utilities</SelectItem>
                 <SelectItem value="entertainment">Entertainment</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="Rent and Utilities">Rent</SelectItem>
+<SelectItem value="Equipment">Equipment</SelectItem>
+<SelectItem value="Salaries and Wages">Salaries and Wages</SelectItem>
+<SelectItem value="Marketing and Advertising">Marketing and Advertising</SelectItem>
+<SelectItem value="Insurance">Insurance</SelectItem>
+<SelectItem value="Cleaning and Hygiene">Cleaning and Hygiene</SelectItem>
+<SelectItem value="Software and Technology">Software and Technology</SelectItem>
+<SelectItem value="Other">Other</SelectItem>
+
               </SelectContent>
             </Select>
           </div>
@@ -341,7 +349,15 @@ const Expenses = () => {
   <option value="Transport" />
   <option value="Utilities" />
   <option value="Entertainment" />
-  <option value="Other" />
+  <option value="Rent and Utilities">Rent and Utilities</option>
+<option value="Equipment">Equipment</option>
+<option value="Salaries and Wages">Salaries and Wages</option>
+<option value="Marketing and Advertising">Marketing and Advertising</option>
+<option value="Insurance">Insurance</option>
+<option value="Cleaning and Hygiene">Cleaning and Hygiene</option>
+<option value="Software and Technology">Software and Technology</option>
+<option value="Other">Other</option>
+
 </datalist>
 
             <Button onClick={handleAddOrUpdateExpense}>{isEditing ? 'Update Expense' : 'Add Expense'}</Button>
