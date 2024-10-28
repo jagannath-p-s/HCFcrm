@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Snackbar, Alert } from '@mui/material';
-import { supabase } from '../supabaseClient'; // Ensure correct path
+import { supabase } from '../supabaseClient';
 
 const SalaryForm = ({ staffs, onSalaryAdded }) => {
   const [formData, setFormData] = useState({
@@ -20,6 +20,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [availableStaffs, setAvailableStaffs] = useState(staffs);
+  const [currentAdvance, setCurrentAdvance] = useState(0); // Store current advance taken
 
   useEffect(() => {
     if (!staffs || staffs.length === 0) {
@@ -38,7 +39,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
     }
   };
 
-  const handleStaffSelect = (staffId) => {
+  const handleStaffSelect = async (staffId) => {
     const selectedStaff = availableStaffs.find((staff) => staff.id.toString() === staffId);
     if (selectedStaff) {
       setFormData((prevData) => ({
@@ -46,6 +47,18 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
         staff_id: staffId,
         salary_amount: selectedStaff.salary || 0,
       }));
+      // Fetch current advance for selected staff
+      const { data: advances, error: advanceError } = await supabase
+        .from('advances')
+        .select('amount')
+        .eq('staff_id', staffId);
+
+      if (advanceError) {
+        console.error('Error fetching advance:', advanceError.message);
+      } else {
+        const totalAdvance = advances.reduce((sum, adv) => sum + Number(adv.amount), 0);
+        setCurrentAdvance(totalAdvance);
+      }
     }
   };
 
@@ -62,17 +75,16 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
       const netSalary = baseSalary + bonuses - deductions;
 
       const { data, error } = await supabase
-        .from('staff_salaries')
+        .from('salaries')
         .insert([
           {
-            staff_id: formData.staff_id,
-            base_salary: baseSalary,
-            advance_taken: deductions,
-            manual_deduction: deductions,
-            total_deductions: deductions,
-            net_salary: netSalary,
-            payment_date: formData.scheduled_payment_date,
-            bonuses: bonuses,
+            employee_id: formData.staff_id,
+            basic_salary: baseSalary,
+            advance: currentAdvance,
+            deductions: deductions,
+            bonus: bonuses,
+            scheduled_date: formData.scheduled_payment_date,
+            status: 'unpaid',
             remarks: formData.remarks,
           },
         ])
@@ -97,6 +109,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
         salary_amount: 0,
         remarks: '',
       });
+      setCurrentAdvance(0); // Reset advance display
     } catch (error) {
       console.error('Error inserting salary:', error.message);
       showSnackbar('Error scheduling salary', 'error');
@@ -123,8 +136,9 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
             <DialogTitle>Schedule Salary Payment</DialogTitle>
             <DialogDescription>Fill out the form below to schedule a salary payment.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
+          {/* Horizontal layout (landscape orientation) */}
+          <div className="flex flex-wrap gap-4 mt-4">
+            <div className="w-full md:w-1/2 lg:w-1/3">
               <label className="text-sm font-medium">Select Staff</label>
               <Select value={formData.staff_id} onValueChange={handleStaffSelect}>
                 <SelectTrigger>
@@ -146,7 +160,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
               </Select>
             </div>
 
-            <div>
+            <div className="w-full md:w-1/2 lg:w-1/3">
               <label className="text-sm font-medium">Scheduled Payment Date</label>
               <Input
                 type="date"
@@ -156,7 +170,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
               />
             </div>
 
-            <div>
+            <div className="w-full md:w-1/2 lg:w-1/3">
               <label className="text-sm font-medium">Deductions</label>
               <Input
                 type="number"
@@ -166,7 +180,7 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
               />
             </div>
 
-            <div>
+            <div className="w-full md:w-1/2 lg:w-1/3">
               <label className="text-sm font-medium">Bonuses</label>
               <Input
                 type="number"
@@ -176,12 +190,17 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div className="w-full md:w-1/2 lg:w-1/3">
               <label className="text-sm font-medium">Base Salary</label>
               <Input type="number" name="salary_amount" value={formData.salary_amount} readOnly />
             </div>
 
-            <div className="md:col-span-2">
+            <div className="w-full md:w-1/2 lg:w-1/3">
+              <label className="text-sm font-medium">Current Advance Taken</label>
+              <Input type="number" value={currentAdvance} readOnly />
+            </div>
+
+            <div className="w-full">
               <label className="text-sm font-medium">Remarks</label>
               <Input
                 name="remarks"
@@ -196,7 +215,16 @@ const SalaryForm = ({ staffs, onSalaryAdded }) => {
         </DialogContent>
       </Dialog>
 
-     
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </>
   );
 };
