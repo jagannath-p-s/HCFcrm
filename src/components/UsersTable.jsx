@@ -1,4 +1,3 @@
-// UsersTable.jsx
 import React, { useState, useEffect } from "react";
 import {
   Table,
@@ -119,12 +118,28 @@ function UsersTable({ users, onEdit, refreshUsers }) {
 
   const handleDeactivateUser = async (user) => {
     try {
-      const { error } = await supabase.from("users").update({ active: false }).eq("id", user.id);
+      // Update user in `users` table to set them as inactive
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ active: false })
+        .eq("id", user.id);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // Add the deactivated user to `deactivated_users` table
+      const { error: insertError } = await supabase.from("deactivated_users").insert({
+        user_id: user.id,
+        name: user.name,
+        email: user.email,
+        mobile_number_1: user.mobile_number_1,
+        deactivated_at: new Date(),
+      });
+
+      if (insertError) throw insertError;
+
       setSnackbarMessage("User deactivated successfully.");
-      refreshUsers();
       setSnackbarSeverity("success");
+      refreshUsers(); // Refresh the users list to reflect changes
     } catch (error) {
       setSnackbarMessage(`Error: ${error.message}`);
       setSnackbarSeverity("error");

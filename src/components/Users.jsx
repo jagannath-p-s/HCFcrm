@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditUserDialog from "./AddEditUserDialog";
 import UsersTable from "./UsersTable";
+import DeactivatedUsersTable from "./DeactivatedUsersTable";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 
@@ -10,6 +11,7 @@ const Users = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showDeactivatedUsers, setShowDeactivatedUsers] = useState(false); // New state to toggle views
 
   useEffect(() => {
     fetchUsersData();
@@ -32,6 +34,10 @@ const Users = () => {
     setIsDialogOpen(true);
   };
 
+  const toggleView = () => {
+    setShowDeactivatedUsers((prev) => !prev);
+  };
+
   return (
     <div className="p-4">
       <Card>
@@ -39,8 +45,19 @@ const Users = () => {
           <CardTitle>Users Management</CardTitle>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleAddUser} className="mb-4">Add User</Button>
-          <UsersTable users={usersData} onEdit={handleEditUser} refreshUsers={fetchUsersData} />
+          <div className="flex items-center justify-between mb-4">
+            <Button onClick={handleAddUser}>Add User</Button>
+            <Button onClick={toggleView} variant="outline">
+              {showDeactivatedUsers ? "View Active Users" : "View All Users"}
+            </Button>
+          </div>
+
+          {/* Conditionally render UsersTable or DeactivatedUsersTable */}
+          {showDeactivatedUsers ? (
+            <DeactivatedUsersTable />
+          ) : (
+            <UsersTable users={usersData} onEdit={handleEditUser} refreshUsers={fetchUsersData} />
+          )}
         </CardContent>
       </Card>
 
