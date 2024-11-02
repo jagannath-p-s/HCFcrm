@@ -99,7 +99,10 @@ function MembershipDialog({ open, onClose, refreshData, userId }) {
 
   const fetchUsers = async (inputValue = "") => {
     try {
-      let query = supabase.from("users").select("id, name, mobile_number_1").limit(20);
+      let query = supabase
+        .from("users")
+        .select("id, name, mobile_number_1")
+        .limit(20);
       if (inputValue.trim()) {
         query = query.or(
           `name.ilike.%${inputValue}%,mobile_number_1.ilike.%${inputValue}%`
@@ -156,7 +159,8 @@ function MembershipDialog({ open, onClose, refreshData, userId }) {
         .limit(1)
         .single();
 
-      if (error && error.code !== "PGRST116") { // PGRST116: No rows found
+      if (error && error.code !== "PGRST116") {
+        // PGRST116: No rows found
         throw error;
       }
 
@@ -288,40 +292,19 @@ function MembershipDialog({ open, onClose, refreshData, userId }) {
 
     setIsLoading(true);
     try {
-      // Check for existing membership for the same user and plan with overlapping dates
-      const { data: existingMemberships, error: fetchError } = await supabase
-        .from("memberships")
-        .select("*")
-        .eq("user_id", membershipFormData.user_id)
-        .eq("membership_plan_id", membershipFormData.membership_plan_id)
-        .gte("end_date", membershipFormData.start_date)
-        .lte("start_date", membershipFormData.end_date);
-
-      if (fetchError) throw fetchError;
-
-      if (existingMemberships && existingMemberships.length > 0) {
-        // Duplicate found
-        setSnackbar({
-          open: true,
-          message:
-            "A membership already exists for this user with overlapping dates.",
-          severity: "error",
-        });
-      } else {
-        // No duplicate, proceed to insert
-        const { error } = await supabase.from("memberships").insert({
-          ...membershipFormData,
-          total_amount: totalAmount,
-        });
-        if (error) throw error;
-        setSnackbar({
-          open: true,
-          message: "Membership added successfully.",
-          severity: "success",
-        });
-        refreshData();
-        onClose();
-      }
+      // Proceed to insert the new membership without checking for overlapping dates
+      const { error } = await supabase.from("memberships").insert({
+        ...membershipFormData,
+        total_amount: totalAmount,
+      });
+      if (error) throw error;
+      setSnackbar({
+        open: true,
+        message: "Membership added successfully.",
+        severity: "success",
+      });
+      refreshData();
+      onClose();
     } catch (error) {
       console.error("Error saving membership:", error);
       setSnackbar({
